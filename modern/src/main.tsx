@@ -4,6 +4,7 @@ import './index.css'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { collection, onSnapshot, orderBy, query, doc } from 'firebase/firestore'
 import { db } from './firebase'
+import { LoginModal } from './features/auth/LoginModal'
 import { SettingsModal } from './features/settings/SettingsModal'
 import { AnalysisModal } from './features/orders/AnalysisModal'
 
@@ -58,14 +59,11 @@ function Header({onOpenSettings,onOpenAnalysis,onToggleSidebar,collapsed}:{onOpe
       </header>
       {showLogoModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={()=>setShowLogoModal(false)}>
-          <div className="bg-white p-8 rounded-lg shadow-2xl max-w-2xl max-h-[90vh] overflow-auto" onClick={e=>e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Logo Tecnoperfil</h3>
-              <button onClick={()=>setShowLogoModal(false)} className="text-gray-500 hover:text-gray-700">
-                <i className="fas fa-times text-xl"/>
-              </button>
-            </div>
-            <img src="/logo-tecno.png" alt="Logo Tecnoperfil Ampliado" className="w-full h-auto object-contain" />
+          <div className="relative bg-white p-4 md:p-8 rounded-lg shadow-2xl max-w-2xl max-h-[90vh] overflow-auto" onClick={e=>e.stopPropagation()}>
+            <button onClick={()=>setShowLogoModal(false)} className="absolute top-2 right-2 text-gray-500 hover:text-gray-700" aria-label="Fechar">
+              <i className="fas fa-times text-xl"/>
+            </button>
+            <img src="/logo-tecno.png" alt="Logo Tecnoperfil" className="w-full h-auto object-contain" />
           </div>
         </div>
       )}
@@ -132,7 +130,15 @@ function Sidebar({onSelect}:{onSelect:(link:Link)=>void}){
         })}
       </div>
       <div className="mt-auto pt-3 border-t flex justify-center">
-        <img src="/logo-danilo.png" alt="Logo Danilo" className="h-20 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity" />
+        <img
+          src="/logo-danilo.png"
+          srcSet="/logo-danilo.png 1x, /logo-danilo@2x.png 2x"
+          sizes="(max-width: 640px) 120px, 160px"
+          alt="Logo Danilo"
+          className="h-20 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity logo-clarity"
+          decoding="async"
+          loading="eager"
+        />
       </div>
     </aside>
   )
@@ -181,6 +187,10 @@ function App(){
   const [openSettings,setOpenSettings]=useState(false)
   const [openAnalysis,setOpenAnalysis]=useState(false)
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
+  const [showLogin,setShowLogin]=useState(false)
+  const [authUser,setAuthUser]=useState<{id:string;username:string}|null>(()=>{
+    try{ const s=sessionStorage.getItem('authUser'); return s? JSON.parse(s): null }catch{ return null }
+  })
   // Deep-link simples por hash
   useEffect(()=>{
     if(location.hash){
@@ -198,7 +208,13 @@ function App(){
 
   return (
     <div className="h-screen grid grid-rows-[auto_1fr]">
-      <Header onOpenSettings={()=>setOpenSettings(true)} onOpenAnalysis={()=>setOpenAnalysis(true)} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} />
+      <Header onOpenSettings={()=>{
+        if(!authUser){
+          setShowLogin(true)
+        }else{
+          setOpenSettings(true)
+        }
+      }} onOpenAnalysis={()=>setOpenAnalysis(true)} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} />
       <main className="grid h-full" style={{gridTemplateColumns: `${sidebarCollapsed? '0px':'280px'} 1fr`, transition: 'grid-template-columns 300ms ease'}}>
         <div aria-hidden={sidebarCollapsed} className="overflow-hidden">
           <Sidebar onSelect={(l)=> setCurrentUrl(l.url)} />
@@ -208,6 +224,7 @@ function App(){
         </section>
       </main>
       <SettingsModal open={openSettings} onClose={()=>setOpenSettings(false)} />
+      <LoginModal open={showLogin} onClose={()=>setShowLogin(false)} onSuccess={(u)=>{ setAuthUser(u); sessionStorage.setItem('authUser', JSON.stringify(u)); setShowLogin(false); setOpenSettings(true) }} />
       <AnalysisModal open={openAnalysis} onClose={()=>setOpenAnalysis(false)} />
     </div>
   )

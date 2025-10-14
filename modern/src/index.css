@@ -8,10 +8,19 @@ body { @apply bg-gray-50 text-gray-900; }
 /* Recorte da barra inferior do Power BI */
 .pbi-crop-wrapper{
   height: 100%;
-  overflow: hidden;
+  overflow: hidden; /* manter conteúdo do iframe dentro do enquadramento */
 }
 .pbi-crop-iframe{
   width: 100%;
   border: none;
   /* altura e translateY são definidos inline para permitir ajuste dinâmico */
+}
+
+/* Nitidez do logo pequeno (evita suavização excessiva em displays scaleados) */
+.logo-clarity {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  backface-visibility: hidden;
+  transform: translateZ(0); /* ajuda alguns navegadores a evitar blur */
+  filter: contrast(1.12) saturate(1.05);
 }
