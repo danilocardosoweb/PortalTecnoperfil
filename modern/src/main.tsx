@@ -44,7 +44,10 @@ function Header({onOpenSettings,onOpenAnalysis,onToggleSidebar,collapsed}:{onOpe
       <button title={collapsed? 'Mostrar menu':'Recolher menu'} onClick={onToggleSidebar} className="px-2 py-1 rounded border">
         <i className={`fa-solid fa-angles-${collapsed?'right':'left'}`}/>
       </button>
-      <div className="font-semibold">TECNOPERFIL</div>
+      <div className="flex items-center gap-2">
+        <img src="/logo-tecno.png" alt="Logo Tecnoperfil" className="h-8 w-8 object-contain" />
+        <div className="font-semibold">TECNOPERFIL</div>
+      </div>
       <div className="flex-1" />
       <button title="Análise" className="px-3 py-1 rounded border" onClick={onOpenAnalysis}><i className="fa-solid fa-table-list mr-1"/>Análise</button>
       <button title="Config" className="ml-2 px-3 py-1 rounded border" onClick={onOpenSettings}><i className="fa-solid fa-gear mr-1"/>Config</button>
@@ -83,7 +86,7 @@ function Sidebar({onSelect}:{onSelect:(link:Link)=>void}){
   },[links])
   const nq=normalize(q)
   return (
-    <aside className="bg-white border-r p-3 flex flex-col gap-3">
+    <aside className="bg-white border-r p-3 flex flex-col gap-3 h-full">
       <input placeholder="Pesquisar..." value={q} onChange={e=>setQ(e.target.value)} className="w-full px-3 py-2 border rounded"/>
       <div className="flex-1 overflow-auto pr-1">
         {cats.map(c=>{
@@ -109,6 +112,9 @@ function Sidebar({onSelect}:{onSelect:(link:Link)=>void}){
             </div>
           )
         })}
+      </div>
+      <div className="mt-auto pt-3 border-t flex justify-center">
+        <img src="/logo-danilo.png" alt="Logo Danilo" className="h-10 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity" />
       </div>
     </aside>
   )
