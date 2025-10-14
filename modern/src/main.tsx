@@ -7,6 +7,7 @@ import { db } from './firebase'
 import { LoginModal } from './features/auth/LoginModal'
 import { SettingsModal } from './features/settings/SettingsModal'
 import { AnalysisModal } from './features/orders/AnalysisModal'
+import { LMEDashboard } from './features/lme/LMEDashboard'
 
 type Category = { id: string; name: string; icon?: string }
 type Link = { id: string; category: string; name: string; url: string; kind?: 'powerbi'|'external' }
@@ -39,7 +40,7 @@ function useLinks(){
 
 const normalize=(s:string)=> s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'')
 
-function Header({onOpenSettings,onOpenAnalysis,onToggleSidebar,collapsed}:{onOpenSettings:()=>void;onOpenAnalysis:()=>void;onToggleSidebar:()=>void;collapsed:boolean}){
+function Header({onOpenSettings,onOpenAnalysis,onOpenLME,onToggleSidebar,collapsed}:{onOpenSettings:()=>void;onOpenAnalysis:()=>void;onOpenLME:()=>void;onToggleSidebar:()=>void;collapsed:boolean}){
   const [showLogoModal,setShowLogoModal]=useState(false)
   return (
     <>
@@ -54,6 +55,7 @@ function Header({onOpenSettings,onOpenAnalysis,onToggleSidebar,collapsed}:{onOpe
           <div className="font-semibold">TECNOPERFIL</div>
         </div>
         <div className="flex-1" />
+        <button title="LME" className="px-3 py-1 rounded border" onClick={onOpenLME}><i className="fa-solid fa-chart-line mr-1"/>LME</button>
         <button title="Análise" className="px-3 py-1 rounded border" onClick={onOpenAnalysis}><i className="fa-solid fa-table-list mr-1"/>Análise</button>
         <button title="Config" className="ml-2 px-3 py-1 rounded border" onClick={onOpenSettings}><i className="fa-solid fa-gear mr-1"/>Config</button>
       </header>
@@ -186,6 +188,7 @@ function App(){
   const [currentUrl,setCurrentUrl]=useState<string>('')
   const [openSettings,setOpenSettings]=useState(false)
   const [openAnalysis,setOpenAnalysis]=useState(false)
+  const [openLME,setOpenLME]=useState(false)
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
   const [showLogin,setShowLogin]=useState(false)
   const [authUser,setAuthUser]=useState<{id:string;username:string}|null>(()=>{
@@ -214,7 +217,7 @@ function App(){
         }else{
           setOpenSettings(true)
         }
-      }} onOpenAnalysis={()=>setOpenAnalysis(true)} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} />
+      }} onOpenAnalysis={()=>setOpenAnalysis(true)} onOpenLME={()=>setOpenLME(true)} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} />
       <main className="grid h-full" style={{gridTemplateColumns: `${sidebarCollapsed? '0px':'280px'} 1fr`, transition: 'grid-template-columns 300ms ease'}}>
         <div aria-hidden={sidebarCollapsed} className="overflow-hidden">
           <Sidebar onSelect={(l)=> setCurrentUrl(l.url)} />
@@ -226,6 +229,7 @@ function App(){
       <SettingsModal open={openSettings} onClose={()=>setOpenSettings(false)} />
       <LoginModal open={showLogin} onClose={()=>setShowLogin(false)} onSuccess={(u)=>{ setAuthUser(u); sessionStorage.setItem('authUser', JSON.stringify(u)); setShowLogin(false); setOpenSettings(true) }} />
       <AnalysisModal open={openAnalysis} onClose={()=>setOpenAnalysis(false)} />
+      <LMEDashboard open={openLME} onClose={()=>setOpenLME(false)} />
     </div>
   )
 }

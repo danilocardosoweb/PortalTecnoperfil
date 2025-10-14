@@ -46,7 +46,7 @@ export function AnalysisModal({open,onClose}:{open:boolean;onClose:()=>void}){
   }
 
   return (
-    <Modal open={open} title="Carteira de Encomendas" onClose={onClose}>
+    <Modal open={open} title="Carteira de Encomendas" onClose={onClose} size="fullscreen">
       <div className="sticky top-0 bg-white pb-3 flex items-center gap-2">
         <label className="font-semibold">Cliente:</label>
         <input value={fCli} onChange={e=>setFCli(e.target.value)} placeholder="Filtrar cliente..." className="px-3 py-2 border rounded"/>
@@ -55,7 +55,7 @@ export function AnalysisModal({open,onClose}:{open:boolean;onClose:()=>void}){
         <button onClick={exportCSV} className="ml-auto px-3 py-2 border rounded"><i className="fa-solid fa-file-csv mr-1"/>Exportar</button>
       </div>
       <div className="text-sm text-gray-500 mb-2">{status}</div>
-      <div className="overflow-auto max-h-[58vh]">
+      <div className="overflow-auto" style={{maxHeight: 'calc(92vh - 220px)'}}>
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-blue-600 text-white">
