@@ -25,6 +25,7 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
   
   // Carteira
   const [carteiraStatus,setCarteiraStatus]=useState('')
+  const [carteiraProgress,setCarteiraProgress]=useState(0)
   
   // Uploads
   const [uploads,setUploads]=useState<Upload[]>([])
@@ -116,6 +117,7 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
   async function handleCarteiraUpload(e:React.ChangeEvent<HTMLInputElement>){
     const file=e.target.files?.[0]; if(!file) return
     setCarteiraStatus('Lendo arquivo...')
+    setCarteiraProgress(5)
     const reader=new FileReader()
     reader.onload=async function(evt){
       try{
@@ -123,6 +125,7 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
         const wb=XLSX.read(data,{type:'array'})
         const ws=wb.Sheets[wb.SheetNames[0]]
         const json=XLSX.utils.sheet_to_json(ws)
+        setCarteiraProgress(10)
 
         // Overwrite: deletar orders e uploads anteriores
         setCarteiraStatus('Removendo dados anteriores...')
@@ -131,8 +134,11 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
         for(let i=0;i<ordIds.length;i+=400){
           const slice=ordIds.slice(i,i+400)
           await Promise.all(slice.map(id=> deleteDoc(doc(db,'orders', id))))
+          const pct = 10 + Math.floor((i / ordIds.length) * 20)
+          setCarteiraProgress(pct)
           setCarteiraStatus(`Removendo pedidos antigos... ${Math.min(i+400, ordIds.length)}/${ordIds.length}`)
         }
+        setCarteiraProgress(30)
         const upSnap = await getDocs(query(collection(db,'uploads')))
         await Promise.all(upSnap.docs.map(async d=>{
           const u=d.data()
@@ -144,13 +150,16 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
         let path = '', downloadURL = ''
         try{
           setCarteiraStatus('Enviando arquivo ao armazenamento...')
+          setCarteiraProgress(35)
           path=`uploads/${Date.now()}-${file.name}`
           const fileRef=stRef(storage, path)
           await uploadBytes(fileRef, new Blob([data]))
           downloadURL=await getDownloadURL(fileRef)
+          setCarteiraProgress(40)
         }catch(storageErr){
           console.warn('Storage indisponível. Prosseguindo sem salvar arquivo.', storageErr)
           setCarteiraStatus('Storage indisponível. Prosseguindo sem salvar arquivo.')
+          setCarteiraProgress(40)
           path=''; downloadURL=''
         }
 
@@ -162,6 +171,7 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
           storagePath:path,
           downloadURL
         })
+        setCarteiraProgress(45)
 
         // Mapear linhas para orders e persistir em lotes
         setCarteiraStatus(`Gravando ${json.length} linhas...`)
@@ -205,13 +215,17 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
           }
           await Promise.all(batchOps)
           written += slice.length
+          const pct = 45 + Math.floor((written / json.length) * 50)
+          setCarteiraProgress(pct)
           setCarteiraStatus(`Gravado ${written}/${json.length}...`)
         }
 
+        setCarteiraProgress(100)
         setCarteiraStatus(`Concluído. Upload ${file.name} (${json.length} linhas).`)
         toast('Carteira enviada e salva no Firebase.','success')
+        setTimeout(()=>{ setCarteiraStatus(''); setCarteiraProgress(0) }, 3000)
       }catch(err){
-        console.error(err); setCarteiraStatus('Erro ao processar e salvar.'); toast('Erro ao processar/salvar no Firebase.','error')
+        console.error(err); setCarteiraStatus('Erro ao processar e salvar.'); setCarteiraProgress(0); toast('Erro ao processar/salvar no Firebase.','error')
       }
     }
     reader.onerror=function(){setCarteiraStatus('Erro ao ler o arquivo.')}
@@ -335,7 +349,21 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
         <div className="space-y-3">
           <p>Carregue seu Excel da Carteira de Encomendas (.xlsx/.xls). Os dados anteriores serão sobrescritos.</p>
           <input type="file" accept=".xlsx,.xls" onChange={handleCarteiraUpload} className="block"/>
-          {carteiraStatus && <div className="text-sm text-gray-600 mt-2">{carteiraStatus}</div>}
+          {carteiraStatus && (
+            <div className="mt-3">
+              <div className="text-sm text-gray-700 mb-2">{carteiraStatus}</div>
+              {carteiraProgress > 0 && (
+                <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                  <div 
+                    className="bg-blue-600 h-full transition-all duration-300 flex items-center justify-center text-xs text-white font-semibold"
+                    style={{width: `${carteiraProgress}%`}}
+                  >
+                    {carteiraProgress}%
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
