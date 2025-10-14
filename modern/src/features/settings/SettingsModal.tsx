@@ -146,22 +146,24 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
           await deleteDoc(doc(db,'uploads', d.id))
         }))
 
-        // Tentar enviar ao Storage
+        // Tentar enviar ao Storage (opcional, pode falhar)
         let path = '', downloadURL = ''
+        setCarteiraStatus('Tentando enviar ao Storage (opcional)...')
+        setCarteiraProgress(35)
         try{
-          setCarteiraStatus('Enviando arquivo ao armazenamento...')
-          setCarteiraProgress(35)
           path=`uploads/${Date.now()}-${file.name}`
           const fileRef=stRef(storage, path)
-          await uploadBytes(fileRef, new Blob([data]))
+          const uploadPromise = uploadBytes(fileRef, new Blob([data]))
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+          await Promise.race([uploadPromise, timeoutPromise])
           downloadURL=await getDownloadURL(fileRef)
-          setCarteiraProgress(40)
-        }catch(storageErr){
-          console.warn('Storage indisponível. Prosseguindo sem salvar arquivo.', storageErr)
-          setCarteiraStatus('Storage indisponível. Prosseguindo sem salvar arquivo.')
-          setCarteiraProgress(40)
+          setCarteiraStatus('Arquivo salvo no Storage.')
+        }catch(storageErr:any){
+          console.warn('Storage falhou (CORS/404). Continuando sem arquivo.', storageErr)
+          setCarteiraStatus('Storage indisponível (continuando sem arquivo).')
           path=''; downloadURL=''
         }
+        setCarteiraProgress(40)
 
         // Criar registro em uploads
         const upDoc=await addDoc(collection(db,'uploads'),{
