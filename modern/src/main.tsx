@@ -39,19 +39,37 @@ function useLinks(){
 const normalize=(s:string)=> s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'')
 
 function Header({onOpenSettings,onOpenAnalysis,onToggleSidebar,collapsed}:{onOpenSettings:()=>void;onOpenAnalysis:()=>void;onToggleSidebar:()=>void;collapsed:boolean}){
+  const [showLogoModal,setShowLogoModal]=useState(false)
   return (
-    <header className="flex items-center gap-3 px-4 h-14 bg-white border-b">
-      <button title={collapsed? 'Mostrar menu':'Recolher menu'} onClick={onToggleSidebar} className="px-2 py-1 rounded border">
-        <i className={`fa-solid fa-angles-${collapsed?'right':'left'}`}/>
-      </button>
-      <div className="flex items-center gap-2">
-        <img src="/logo-tecno.png" alt="Logo Tecnoperfil" className="h-8 w-8 object-contain" />
-        <div className="font-semibold">TECNOPERFIL</div>
-      </div>
-      <div className="flex-1" />
-      <button title="Análise" className="px-3 py-1 rounded border" onClick={onOpenAnalysis}><i className="fa-solid fa-table-list mr-1"/>Análise</button>
-      <button title="Config" className="ml-2 px-3 py-1 rounded border" onClick={onOpenSettings}><i className="fa-solid fa-gear mr-1"/>Config</button>
-    </header>
+    <>
+      <header className="flex items-center gap-3 px-4 h-14 bg-white border-b">
+        <button title={collapsed? 'Mostrar menu':'Recolher menu'} onClick={onToggleSidebar} className="px-2 py-1 rounded border">
+          <i className={`fa-solid fa-angles-${collapsed?'right':'left'}`}/>
+        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={()=>setShowLogoModal(true)} className="hover:opacity-80 transition-opacity" title="Ver logo ampliado">
+            <img src="/logo-tecno.png" alt="Logo Tecnoperfil" className="h-8 w-8 object-contain cursor-pointer" />
+          </button>
+          <div className="font-semibold">TECNOPERFIL</div>
+        </div>
+        <div className="flex-1" />
+        <button title="Análise" className="px-3 py-1 rounded border" onClick={onOpenAnalysis}><i className="fa-solid fa-table-list mr-1"/>Análise</button>
+        <button title="Config" className="ml-2 px-3 py-1 rounded border" onClick={onOpenSettings}><i className="fa-solid fa-gear mr-1"/>Config</button>
+      </header>
+      {showLogoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={()=>setShowLogoModal(false)}>
+          <div className="bg-white p-8 rounded-lg shadow-2xl max-w-2xl max-h-[90vh] overflow-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Logo Tecnoperfil</h3>
+              <button onClick={()=>setShowLogoModal(false)} className="text-gray-500 hover:text-gray-700">
+                <i className="fas fa-times text-xl"/>
+              </button>
+            </div>
+            <img src="/logo-tecno.png" alt="Logo Tecnoperfil Ampliado" className="w-full h-auto object-contain" />
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -114,7 +132,7 @@ function Sidebar({onSelect}:{onSelect:(link:Link)=>void}){
         })}
       </div>
       <div className="mt-auto pt-3 border-t flex justify-center">
-        <img src="/logo-danilo.png" alt="Logo Danilo" className="h-10 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity" />
+        <img src="/logo-danilo.png" alt="Logo Danilo" className="h-20 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity" />
       </div>
     </aside>
   )
