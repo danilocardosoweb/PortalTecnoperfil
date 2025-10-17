@@ -8,6 +8,8 @@ import { LoginModal } from './features/auth/LoginModal'
 import { SettingsModal } from './features/settings/SettingsModal'
 import { AnalysisModal } from './features/orders/AnalysisModal'
 import { AgentModal } from './features/agent/AgentModal'
+import { NewsCarousel } from './features/news/NewsCarousel'
+import { NewsTicker } from './features/news/NewsTicker'
 
 type Category = { id: string; name: string; icon?: string; order?: number }
 type Link = { id: string; category: string; name: string; url: string; kind?: 'powerbi'|'external'; order?: number; isFavorite?: boolean }
@@ -312,7 +314,16 @@ function App(){
           <Sidebar onSelect={(l)=> setCurrentUrl(l.url)} currentUrl={currentUrl} />
         </div>
         <section className="flex-1 p-0">
-          <DashboardFrame url={currentUrl} isInitialLoad={isInitialLoad} />
+          {currentUrl
+            ? <DashboardFrame url={currentUrl} isInitialLoad={isInitialLoad} />
+            : (
+              <div className="h-full flex flex-col">
+                <NewsTicker />
+                <div className="flex-1">
+                  <NewsCarousel />
+                </div>
+              </div>
+            )}
         </section>
       </main>
       <SettingsModal open={openSettings} onClose={()=>setOpenSettings(false)} />

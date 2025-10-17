@@ -12,7 +12,7 @@ type Link = { id: string; category: string; name: string; url: string; kind?: 'p
 type Upload = { id: string; filename: string; sizeBytes: number; uploadedAt: any; storagePath?: string; downloadURL?: string }
 
 export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
-  const [tab,setTab]=useState<'geral'|'categorias'|'links'|'carteira'|'uploads'|'documentos'>('geral')
+  const [tab,setTab]=useState<'geral'|'categorias'|'links'|'carteira'|'uploads'|'documentos'|'news'>('geral')
   
   // Categorias
   const [cats,setCats]=useState<Category[]>([])
@@ -51,6 +51,23 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
   const [uploadingDoc,setUploadingDoc]=useState(false)
   const [dragActive,setDragActive]=useState(false)
   const fileInputRef=useRef<HTMLInputElement>(null)
+
+  // News (carrossel)
+  type NewsSlide = { id:string; imageUrl:string; title?:string; subtitle?:string; linkUrl?:string; order?:number; active?:boolean; startAt?:any; endAt?:any }
+  const [news,setNews]=useState<NewsSlide[]>([])
+  const newsFileInputRef=useRef<HTMLInputElement>(null)
+  const [newTitle,setNewTitle]=useState('')
+  const [newSubtitle,setNewSubtitle]=useState('')
+  const [newLink,setNewLink]=useState('')
+  const [newOrder,setNewOrder]=useState<number>( (Date.now()%1000) )
+  const [newImageUrl,setNewImageUrl]=useState('')
+  const [savingSlide,setSavingSlide]=useState(false)
+  const storagePathRef = useRef<string>('')
+
+  // News: Ticker
+  const [tickerEnabled,setTickerEnabled]=useState(false)
+  const [tickerItems,setTickerItems]=useState<string[]>([])
+  const [tickerNew,setTickerNew]=useState('')
 
   useEffect(()=>{
     if(!open) return
@@ -96,13 +113,30 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
     const unsubUploads = onSnapshot(query(collection(db,'uploads'), orderBy('uploadedAt','desc')), (snap)=>{
       setUploads(snap.docs.map(d=>({id:d.id, ...(d.data() as any)})))
     })
+    // Listener de news
+    const unsubNews = onSnapshot(collection(db,'news_slides'), (snap)=>{
+      const rows = snap.docs.map(d=>({id:d.id, ...(d.data() as any)})) as NewsSlide[]
+      rows.sort((a,b)=> (a.order||999)-(b.order||999))
+      setNews(rows)
+    })
+    // Listener de settings do ticker
+    const unsubTicker = onSnapshot(doc(db,'news_settings','default'), (s)=>{
+      const d = s.data() as any
+      if(d){
+        setTickerEnabled(!!d.tickerEnabled)
+        setTickerItems(Array.isArray(d.tickerItems)? d.tickerItems.filter(Boolean): [])
+      } else {
+        setTickerEnabled(false)
+        setTickerItems([])
+      }
+    })
     
     // Carregar documentos do Supabase
     if(tab==='documentos'){
       loadDocuments()
     }
     
-    return ()=>{ unsubCats(); unsubLinks(); unsubUploads(); }
+    return ()=>{ unsubCats(); unsubLinks(); unsubUploads(); unsubNews(); unsubTicker(); }
   },[open,tab])
 
   useEffect(()=>{ if(cats.length && !linkCat) setLinkCat(cats[0].name) },[cats])
@@ -340,7 +374,9 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
     const name = editCatName.trim()
     if (!name) { alert('Nome não pode estar vazio.'); return }
     try {
-      await updateDoc(doc(db, 'categories', id), { name })
+      const payload: any = { name }
+      if (editCatIcon && editCatIcon.trim()) payload.icon = editCatIcon.trim()
+      await updateDoc(doc(db, 'categories', id), payload)
       setEditingCat(null)
       toast('Categoria editada.', 'success')
     } catch (err) { console.error(err); toast('Erro ao editar.', 'error') }
@@ -363,12 +399,41 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
   function startEditCategory(cat: Category) {
     setEditingCat(cat.id)
     setEditCatName(cat.name)
+    setEditCatIcon(cat.icon || '')
   }
 
   function startEditLink(link: Link) {
     setEditingLink(link.id)
     setEditLinkName(link.name)
     setEditLinkUrl(link.url)
+  }
+
+  // Renderizar ícone por classe (Font Awesome) ou URL de imagem
+  function renderCategoryIcon(icon?: string){
+    const v = icon || 'fas fa-star'
+    if (/^(https?:|data:)/i.test(v)) {
+      return <img src={v} alt="icon" className="w-4 h-4 object-contain inline-block align-middle"/>
+    }
+    return <i className={v}/>
+  }
+
+  // Upload de ícone personalizado para Storage e atribuição ao campo icon como URL
+  async function handleUploadCategoryIcon(e: React.ChangeEvent<HTMLInputElement>, catId: string){
+    const file = e.target.files?.[0]
+    if(!file) return
+    try{
+      const path = `category-icons/${catId}-${Date.now()}-${file.name}`
+      const ref = stRef(storage, path)
+      await uploadBytes(ref, file)
+      const url = await getDownloadURL(ref)
+      setEditCatIcon(url)
+      toast('Ícone carregado. Clique em Salvar para aplicar.','success')
+    }catch(err){
+      console.error(err)
+      toast('Falha ao enviar ícone.','error')
+    }finally{
+      try{ e.target.value = '' }catch{}
+    }
   }
 
   // Funções de favoritos
@@ -481,13 +546,64 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
     alert(`[${type.toUpperCase()}] ${msg}`)
   }
 
+  // ===== NEWS helpers (fora do useEffect) =====
+  async function handleNewsImageUpload(files: FileList | null){
+    if(!files || !files[0]) return
+    const f=files[0]
+    try{
+      const path = `news/${Date.now()}-${f.name}`
+      const ref = stRef(storage, path)
+      await uploadBytes(ref, f)
+      const url = await getDownloadURL(ref)
+      setNewImageUrl(url)
+      storagePathRef.current = path
+      toast('Imagem enviada.','success')
+    }catch(err){ console.error(err); toast('Falha ao enviar imagem.','error') }
+    finally{ if(newsFileInputRef.current) newsFileInputRef.current.value='' }
+  }
+  async function addNewsSlide(){
+    if(!newImageUrl){ alert('Envie uma imagem para o slide.'); return }
+    try{
+      setSavingSlide(true)
+      await addDoc(collection(db,'news_slides'),{
+        imageUrl:newImageUrl, storagePath: storagePathRef.current || null, title:newTitle, subtitle:newSubtitle, linkUrl:newLink||null,
+        order: isFinite(Number(newOrder))? Number(newOrder): 999,
+        active:true, createdAt: serverTimestamp()
+      })
+      setNewTitle(''); setNewSubtitle(''); setNewLink(''); setNewOrder((Date.now()%1000)); setNewImageUrl(''); storagePathRef.current=''
+      toast('Slide criado.','success')
+    }catch(err){ console.error(err); toast('Erro ao criar slide.','error') }
+    finally{ setSavingSlide(false) }
+  }
+  async function updateNewsSlide(id:string, patch:Partial<NewsSlide>){
+    try{ await updateDoc(doc(db,'news_slides', id), patch as any); toast('Slide atualizado.','success') }catch(err){ console.error(err); toast('Erro ao atualizar.','error') }
+  }
+  async function deleteNewsSlide(id:string){
+    if(!confirm('Excluir este slide?')) return
+    try{ await deleteDoc(doc(db,'news_slides', id)); toast('Slide excluído.','success') }catch(err){ console.error(err); toast('Erro ao excluir.','error') }
+  }
+
+  async function saveNewsTicker(patch: Partial<{tickerEnabled:boolean; tickerItems:string[]}>) {
+    try {
+      await setDoc(doc(db, 'news_settings', 'default'), {
+        tickerEnabled,
+        tickerItems,
+        ...patch
+      }, { merge: true })
+      toast('Ticker salvo.','success')
+    } catch (err) {
+      console.error(err)
+      toast('Erro ao salvar ticker.','error')
+    }
+  }
+
   return (
     <Modal open={open} title="Configurações" onClose={onClose}>
       <div className="sticky top-0 bg-white pb-3 z-10">
         <div className="flex gap-2 mb-3 flex-wrap">
-          {(['geral','categorias','links','carteira','uploads','documentos'] as const).map(t=>
+          {(['geral','categorias','links','carteira','uploads','documentos','news'] as const).map(t=>
             <button key={t} onClick={()=>setTab(t)} className={`px-3 py-1 rounded-full border ${tab===t?'bg-blue-600 text-white border-blue-600':'hover:border-blue-400'}`}>{
-              t==='geral'?'Geral':t==='categorias'?'Categorias':t==='links'?'Links do Power BI':t==='carteira'?'Carteira de Encomendas':t==='uploads'?'Uploads':'Documentos IA'
+              t==='geral'?'Geral':t==='categorias'?'Categorias':t==='links'?'Links do Power BI':t==='carteira'?'Carteira de Encomendas':t==='uploads'?'Uploads':t==='documentos'?'Documentos IA':'News'
             }</button>
           )}
         </div>
@@ -519,6 +635,113 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
         </div>
       )}
 
+      {tab==='news' && (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-gray-700">Tecnoperfil News - Carrossel</h3>
+          <div className="grid md:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-gray-600">Imagem do slide</label>
+              <div className="flex items-center gap-2">
+                <input ref={newsFileInputRef} type="file" accept="image/*,image/svg+xml" onChange={e=>handleNewsImageUpload(e.target.files)} />
+                {newImageUrl && <img src={newImageUrl} alt="preview" className="h-10 w-16 object-cover rounded border"/>}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-gray-600">Título</label>
+              <input value={newTitle} onChange={e=>setNewTitle(e.target.value)} className="px-3 py-2 border rounded" placeholder="Título (opcional)"/>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-gray-600">Subtítulo</label>
+              <input value={newSubtitle} onChange={e=>setNewSubtitle(e.target.value)} className="px-3 py-2 border rounded" placeholder="Subtítulo (opcional)"/>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-gray-600">Link</label>
+              <input value={newLink} onChange={e=>setNewLink(e.target.value)} className="px-3 py-2 border rounded" placeholder="https://... (opcional)"/>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-gray-600">Ordem</label>
+              <input type="number" value={newOrder} onChange={e=>setNewOrder(Number(e.target.value))} className="px-3 py-2 border rounded w-28"/>
+            </div>
+            <button onClick={addNewsSlide} disabled={savingSlide} className="px-3 py-2 bg-blue-600 text-white rounded disabled:opacity-50">Adicionar slide</button>
+          </div>
+
+          <div className="border rounded">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="p-2 text-left">Prévia</th>
+                  <th className="p-2 text-left">Título</th>
+                  <th className="p-2 text-left">Subtítulo</th>
+                  <th className="p-2 text-left">Link</th>
+                  <th className="p-2 text-left">Ordem</th>
+                  <th className="p-2 text-left">Ativo</th>
+                  <th className="p-2 text-left">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {news.map(n=> (
+                  <tr key={n.id} className="border-t">
+                    <td className="p-2"><img src={n.imageUrl} alt="" className="h-10 w-16 object-cover rounded"/></td>
+                    <td className="p-2">
+                      <input defaultValue={n.title||''} onBlur={e=>updateNewsSlide(n.id,{title:e.target.value})} className="px-2 py-1 border rounded w-full"/>
+                    </td>
+                    <td className="p-2">
+                      <input defaultValue={n.subtitle||''} onBlur={e=>updateNewsSlide(n.id,{subtitle:e.target.value})} className="px-2 py-1 border rounded w-full"/>
+                    </td>
+                    <td className="p-2">
+                      <input defaultValue={n.linkUrl||''} onBlur={e=>updateNewsSlide(n.id,{linkUrl: e.target.value || undefined})} className="px-2 py-1 border rounded w-full"/>
+                    </td>
+                    <td className="p-2">
+                      <input type="number" defaultValue={n.order||0} onBlur={e=>updateNewsSlide(n.id,{order:Number(e.target.value)})} className="px-2 py-1 border rounded w-24"/>
+                    </td>
+                    <td className="p-2">
+                      <label className="inline-flex items-center gap-2">
+                        <input type="checkbox" defaultChecked={n.active!==false} onChange={e=>updateNewsSlide(n.id,{active:e.target.checked})}/>
+                        Ativo
+                      </label>
+                    </td>
+                    <td className="p-2">
+                      <button onClick={()=>deleteNewsSlide(n.id)} className="px-2 py-1 border rounded text-red-600 hover:bg-red-600 hover:text-white">Excluir</button>
+                    </td>
+                  </tr>
+                ))}
+                {news.length===0 && (
+                  <tr><td colSpan={7} className="p-4 text-center text-gray-500">Nenhum slide cadastrado.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <h4 className="font-semibold text-gray-700">Ticker (faixa de notícias)</h4>
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={tickerEnabled} onChange={e=>{ setTickerEnabled(e.target.checked); saveNewsTicker({ tickerEnabled: e.target.checked }) }} />
+              Ativar ticker na home
+            </label>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="text-sm text-gray-600">Novo item</label>
+                <input value={tickerNew} onChange={e=>setTickerNew(e.target.value)} className="px-3 py-2 border rounded w-full" placeholder="Ex.: IBOV 128.500 pts • Segurança: Semana SIPAT..."/>
+              </div>
+              <button className="px-3 py-2 bg-green-600 text-white rounded" onClick={()=>{
+                const v=tickerNew.trim(); if(!v) return; const next=[...tickerItems, v]; setTickerItems(next); setTickerNew(''); saveNewsTicker({ tickerItems: next })
+              }}>Adicionar</button>
+            </div>
+            {tickerItems.length>0 && (
+              <ul className="space-y-1">
+                {tickerItems.map((t, i)=> (
+                  <li key={i} className="flex items-center justify-between p-2 border rounded">
+                    <span className="text-sm text-gray-700">{t}</span>
+                    <button className="px-2 py-1 border rounded text-red-600 hover:bg-red-600 hover:text-white" onClick={()=>{
+                      const next = tickerItems.filter((_,idx)=> idx!==i); setTickerItems(next); saveNewsTicker({ tickerItems: next })
+                    }}>Remover</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
       {tab==='categorias' && (
         <div className="space-y-3">
           <div className="grid md:grid-cols-[1fr_220px_auto] gap-2 sticky top-0 bg-white pb-2">
@@ -616,7 +839,7 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
                 <div className="flex items-center gap-2">
                   {editingCat === c.id ? (
                     <div className="flex items-center gap-2">
-                      <i className={c.icon||'fas fa-star'}/>
+                      {renderCategoryIcon(editCatIcon || c.icon)}
                       <input 
                         value={editCatName} 
                         onChange={e=>setEditCatName(e.target.value)}
@@ -624,11 +847,102 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
                         className="px-2 py-1 border rounded font-semibold"
                         autoFocus
                       />
+                      <select value={editCatIcon} onChange={e=>setEditCatIcon(e.target.value)} className="px-2 py-1 border rounded text-sm">
+                        <option value="fas fa-star">⭐ Padrão (estrela)</option>
+                        <optgroup label="📊 Negócios & Comercial">
+                          <option value="fas fa-chart-line">📈 Gráfico de Linha</option>
+                          <option value="fas fa-chart-bar">📊 Gráfico de Barras</option>
+                          <option value="fas fa-chart-pie">🥧 Gráfico Pizza</option>
+                          <option value="fas fa-briefcase">💼 Maleta</option>
+                          <option value="fas fa-handshake">🤝 Aperto de Mão</option>
+                          <option value="fas fa-dollar-sign">💵 Cifrão</option>
+                          <option value="fas fa-coins">🪙 Moedas</option>
+                          <option value="fas fa-receipt">🧻 Recibo</option>
+                          <option value="fas fa-file-invoice-dollar">📄 Fatura</option>
+                        </optgroup>
+                        <optgroup label="🏭 Produção & Indústria">
+                          <option value="fas fa-industry">🏭 Indústria</option>
+                          <option value="fas fa-cogs">⚙️ Engrenagens</option>
+                          <option value="fas fa-hammer">🔨 Martelo</option>
+                          <option value="fas fa-hard-hat">🪠 Capacete</option>
+                          <option value="fas fa-tools">🛠️ Ferramentas</option>
+                          <option value="fas fa-boxes">📦 Caixas</option>
+                          <option value="fas fa-pallet">📦 Palete</option>
+                          <option value="fas fa-cubes">🧱 Cubos</option>
+                        </optgroup>
+                        <optgroup label="🚚 Logística & Transporte">
+                          <option value="fas fa-truck">🚚 Caminhão</option>
+                          <option value="fas fa-shipping-fast">🚀 Envio Rápido</option>
+                          <option value="fas fa-dolly">🛒 Carrinho</option>
+                          <option value="fas fa-warehouse">🏭 Armazém</option>
+                          <option value="fas fa-route">🗺️ Rota</option>
+                          <option value="fas fa-map-marked-alt">🗺️ Mapa</option>
+                          <option value="fas fa-plane">✈️ Avião</option>
+                          <option value="fas fa-ship">🚢 Navio</option>
+                        </optgroup>
+                        <optgroup label="🔧 Manutenção & Qualidade">
+                          <option value="fas fa-wrench">🔧 Chave Inglesa</option>
+                          <option value="fas fa-screwdriver">🪛 Chave de Fenda</option>
+                          <option value="fas fa-toolbox">🧰 Caixa de Ferramentas</option>
+                          <option value="fas fa-clipboard-check">✅ Checklist</option>
+                          <option value="fas fa-tasks">☑️ Tarefas</option>
+                          <option value="fas fa-certificate">🏆 Certificado</option>
+                          <option value="fas fa-award">🏅 Prêmio</option>
+                          <option value="fas fa-medal">🏅 Medalha</option>
+                        </optgroup>
+                        <optgroup label="📊 Dashboards & Relatórios">
+                          <option value="fas fa-tachometer-alt">📊 Dashboard</option>
+                          <option value="fas fa-chart-area">📉 Gráfico Área</option>
+                          <option value="fas fa-analytics">📊 Analytics</option>
+                          <option value="fas fa-file-chart-line">📈 Relatório</option>
+                          <option value="fas fa-clipboard-list">📋 Lista</option>
+                          <option value="fas fa-table">📋 Tabela</option>
+                        </optgroup>
+                        <optgroup label="📁 Arquivos & Documentos">
+                          <option value="fas fa-folder">📁 Pasta</option>
+                          <option value="fas fa-folder-open">📂 Pasta Aberta</option>
+                          <option value="fas fa-file">📄 Arquivo</option>
+                          <option value="fas fa-file-alt">📄 Documento</option>
+                          <option value="fas fa-file-pdf">📄 PDF</option>
+                          <option value="fas fa-file-excel">📄 Excel</option>
+                          <option value="fas fa-archive">🗃️ Arquivo</option>
+                        </optgroup>
+                        <optgroup label="👥 Pessoas & Equipe">
+                          <option value="fas fa-users">👥 Usuários</option>
+                          <option value="fas fa-user-tie">👔 Executivo</option>
+                          <option value="fas fa-user-cog">⚙️ Admin</option>
+                          <option value="fas fa-id-card">🪙 Identificação</option>
+                          <option value="fas fa-user-shield">🛡️ Segurança</option>
+                        </optgroup>
+                        <optgroup label="⚙️ Sistema & Configurações">
+                          <option value="fas fa-cog">⚙️ Configuração</option>
+                          <option value="fas fa-sliders-h">🎹 Controles</option>
+                          <option value="fas fa-database">💾 Banco de Dados</option>
+                          <option value="fas fa-server">💻 Servidor</option>
+                          <option value="fas fa-network-wired">🌐 Rede</option>
+                        </optgroup>
+                        <optgroup label="⭐ Outros">
+                          <option value="fas fa-bookmark">🔖 Favorito</option>
+                          <option value="fas fa-bell">🔔 Notificação</option>
+                          <option value="fas fa-calendar">📅 Calendário</option>
+                          <option value="fas fa-clock">⏰ Relógio</option>
+                          <option value="fas fa-home">🏠 Início</option>
+                          <option value="fas fa-building">🏛️ Prédio</option>
+                          <option value="fas fa-store">🏪 Loja</option>
+                          <option value="fas fa-shopping-cart">🛒 Carrinho</option>
+                        </optgroup>
+                        <option value={editCatIcon && /^https?:/i.test(editCatIcon) ? editCatIcon : ''} disabled>──────────</option>
+                        <option value={editCatIcon && /^https?:/i.test(editCatIcon) ? editCatIcon : ''} disabled>{editCatIcon && /^https?:/i.test(editCatIcon) ? 'Ícone personalizado (URL)' : 'Carregar abaixo'}</option>
+                      </select>
+                      <label className="px-2 py-1 border rounded text-sm cursor-pointer bg-gray-50 hover:bg-gray-100">
+                        Carregar ícone...
+                        <input type="file" accept="image/*,image/svg+xml" className="hidden" onChange={e=>handleUploadCategoryIcon(e, c.id)} />
+                      </label>
                       <button onClick={()=>saveEditCategory(c.id)} className="px-2 py-1 bg-green-600 text-white rounded text-sm">Salvar</button>
                       <button onClick={()=>setEditingCat(null)} className="px-2 py-1 bg-gray-400 text-white rounded text-sm">Cancelar</button>
                     </div>
                   ) : (
-                    <span className="font-semibold cursor-pointer" onClick={()=>startEditCategory(c)}><i className={c.icon||'fas fa-star'}/> {c.name}</span>
+                    <span className="font-semibold cursor-pointer" onClick={()=>startEditCategory(c)}>{renderCategoryIcon(c.icon||'fas fa-star')} {c.name}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-1">

@@ -69,7 +69,7 @@ export function AgentModal({ open, onClose }: { open: boolean; onClose: () => vo
   const [loading, setLoading] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState<AgentType>('pcp')
   const [documents, setDocuments] = useState<any[]>([])
-  const [showQuickQuestions, setShowQuickQuestions] = useState(true)
+  const [showQuickQuestions, setShowQuickQuestions] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   const currentAgent = AGENTS[selectedAgent]
@@ -179,13 +179,24 @@ export function AgentModal({ open, onClose }: { open: boolean; onClose: () => vo
     }
   }
 
-  function handleClearConversation(){
-    setMessages([])
-    // manter foco no input após limpar
-    setTimeout(()=>{
-      const el = document.querySelector('input[placeholder^="Digite sua pergunta"]') as HTMLInputElement | null
-      el?.focus()
-    }, 0)
+  async function handleClearConversation(){
+    try{
+      // Apagar histórico no Supabase para não recarregar após reabrir
+      // Usar filtro seguro (todas as linhas com created_at >= 1900-01-01)
+      await supabase
+        .from('chat_history')
+        .delete()
+        .gte('created_at', '1900-01-01')
+    }catch(err){
+      console.error('Falha ao limpar histórico:', err)
+    }finally{
+      setMessages([])
+      // manter foco no input após limpar
+      setTimeout(()=>{
+        const el = document.querySelector('input[placeholder^="Digite sua pergunta"]') as HTMLInputElement | null
+        el?.focus()
+      }, 0)
+    }
   }
 
 
@@ -206,8 +217,11 @@ export function AgentModal({ open, onClose }: { open: boolean; onClose: () => vo
               <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm">
                 <i className={`fas ${currentAgent.icon} text-white text-xl`}/>
               </div>
-              <div>
+              <div className="flex items-center gap-3">
                 <h2 className="text-white font-bold text-lg">Agente {currentAgent.name}</h2>
+                <span className="text-white/80 text-xs italic bg-white/10 px-2 py-0.5 rounded">
+                  ( Em desenvolvimento )
+                </span>
               </div>
             </div>
             <div className="flex items-center gap-2">
