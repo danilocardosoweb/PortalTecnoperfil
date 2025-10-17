@@ -144,12 +144,12 @@ function Sidebar({onSelect}:{onSelect:(link:Link)=>void}){
   )
 }
 
-function DashboardFrame({url}:{url:string}){
+function DashboardFrame({url,isInitialLoad}:{url:string;isInitialLoad:boolean}){
   const [src,setSrc]=useState('')
-  // Recorte percentual da barra inferior (default 7%)
-  const [cropPct,setCropPct]=useState<number>(()=> Number(localStorage.getItem('pbiCropPct')||'7'))
+  // Recorte percentual da barra inferior (default 2%)
+  const [cropPct,setCropPct]=useState<number>(()=> Number(localStorage.getItem('pbiCropPct')||'2'))
   useEffect(()=>{
-    const onStorage=(e:StorageEvent)=>{ if(e.key==='pbiCropPct'){ setCropPct(Number(localStorage.getItem('pbiCropPct')||'7')) } }
+    const onStorage=(e:StorageEvent)=>{ if(e.key==='pbiCropPct'){ setCropPct(Number(localStorage.getItem('pbiCropPct')||'2')) } }
     window.addEventListener('storage', onStorage)
     const onCustom=(e:any)=>{ const v=Number(e?.detail); if(isFinite(v)) setCropPct(v) }
     window.addEventListener('pbi-crop-change', onCustom as any)
@@ -163,10 +163,16 @@ function DashboardFrame({url}:{url:string}){
   useEffect(()=>{
     if(!url){ setSrc(''); return }
     const isPowerBi=/app\.powerbi\.com\/view/i.test(url)
-    if(!isPowerBi){ window.open(/^https?:\/\//i.test(url)?url:`https://${url}`,'_blank'); return }
+    // Só abre links externos se NÃO for o carregamento inicial (evita abrir no F5/reload)
+    if(!isPowerBi){ 
+      if(!isInitialLoad){
+        window.open(/^https?:\/\//i.test(url)?url:`https://${url}`,'_blank')
+      }
+      return 
+    }
     const u=url+(url.includes('?')?'&':'?')+'navContentPaneEnabled=false'
     setSrc(u)
-  },[url])
+  },[url,isInitialLoad])
   return (
     <div className="pbi-crop-wrapper">
       <iframe
@@ -174,8 +180,9 @@ function DashboardFrame({url}:{url:string}){
         src={src}
         className="pbi-crop-iframe"
         style={{
-          height: '100%',
-          clipPath: `inset(0 0 ${cropPct}% 0)`
+          height: '110%',
+          clipPath: `inset(0 0 ${cropPct}% 0)`,
+          transform: 'translateY(0.5%)'
         }}
       />
     </div>
@@ -188,6 +195,7 @@ function App(){
   const [openAnalysis,setOpenAnalysis]=useState(false)
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
   const [showLogin,setShowLogin]=useState(false)
+  const [isInitialLoad,setIsInitialLoad]=useState(true)
   const [authUser,setAuthUser]=useState<{id:string;username:string}|null>(()=>{
     try{ const s=sessionStorage.getItem('authUser'); return s? JSON.parse(s): null }catch{ return null }
   })
@@ -196,6 +204,9 @@ function App(){
     if(location.hash){
       try{ setCurrentUrl(decodeURIComponent(location.hash.slice(1))) }catch{}
     }
+    // Marca que o carregamento inicial terminou após um pequeno delay
+    const timer = setTimeout(()=> setIsInitialLoad(false), 100)
+    return ()=> clearTimeout(timer)
   },[])
   useEffect(()=>{ if(currentUrl) location.hash=encodeURIComponent(currentUrl) },[currentUrl])
   useEffect(()=>{
@@ -215,12 +226,16 @@ function App(){
           setOpenSettings(true)
         }
       }} onOpenAnalysis={()=>setOpenAnalysis(true)} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} />
-      <main className="grid h-full" style={{gridTemplateColumns: `${sidebarCollapsed? '0px':'280px'} 1fr`, transition: 'grid-template-columns 300ms ease'}}>
-        <div aria-hidden={sidebarCollapsed} className="overflow-hidden">
+      <main className="flex h-full">
+        <div style={{
+          width: sidebarCollapsed ? '0px' : '280px',
+          transition: 'width 300ms ease',
+          overflow: 'hidden'
+        }} aria-hidden={sidebarCollapsed}>
           <Sidebar onSelect={(l)=> setCurrentUrl(l.url)} />
         </div>
-        <section className="p-2 h-full">
-          <DashboardFrame url={currentUrl} />
+        <section className="flex-1 p-0">
+          <DashboardFrame url={currentUrl} isInitialLoad={isInitialLoad} />
         </section>
       </main>
       <SettingsModal open={openSettings} onClose={()=>setOpenSettings(false)} />

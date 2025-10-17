@@ -7,12 +7,18 @@ body { @apply bg-gray-50 text-gray-900; }
 
 /* Recorte da barra inferior do Power BI */
 .pbi-crop-wrapper{
-  height: 100%;
+  height: calc(100vh - 56px); /* usar toda a altura abaixo do header */
+  width: 100%;
   overflow: hidden; /* manter conteúdo do iframe dentro do enquadramento */
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  background: white;
 }
 .pbi-crop-iframe{
   width: 100%;
+  height: 110%; /* cobre melhor a barra inferior do Power BI */
   border: none;
+  display: block;
   /* altura e translateY são definidos inline para permitir ajuste dinâmico */
 }
 
