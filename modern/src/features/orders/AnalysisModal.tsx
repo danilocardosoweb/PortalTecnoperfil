@@ -54,7 +54,10 @@ export function AnalysisModal({open,onClose}:{open:boolean;onClose:()=>void}){
   },[orders,fCli,fFer,usinagem])
 
   function fmtDate(v:any){ try{ if(!v) return ''; const dt=v.seconds? new Date(v.seconds*1000): new Date(v); return dt.toLocaleDateString('pt-BR') }catch{ return '' } }
-  function fmtNum(v:any){ try{ const n=toNumberPtSafe(v); return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}).format(n) }catch{ return String(v??'') } }
+  // 2 casas decimais (Kg e Valor)
+  function fmtNum2(v:any){ try{ const n=toNumberPtSafe(v); return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}).format(n) }catch{ return String(v??'') } }
+  // 0 casas decimais (Peças)
+  function fmtInt(v:any){ try{ const n=toNumberPtSafe(v); return new Intl.NumberFormat('pt-BR',{maximumFractionDigits:0}).format(n) }catch{ return String(v??'') } }
 
   function exportCSV(){
     if(!rows.length) return
@@ -155,9 +158,9 @@ export function AnalysisModal({open,onClose}:{open:boolean;onClose:()=>void}){
                 <td className="px-2 py-1">{o.status}</td><td className="px-2 py-1">{o.pedido}</td><td className="px-2 py-1">{o.cliente}</td><td className="px-2 py-1">{o.nr_pedido}</td>
                 <td className="px-2 py-1">{fmtDate(o.data_implant)}</td><td className="px-2 py-1">{fmtDate(o.data_entrega)}</td><td className="px-2 py-1">{fmtDate(o.data_ult_fat)}</td>
                 <td className="px-2 py-1">{o.produto}</td><td className="px-2 py-1">{o.ferramenta}</td><td className="px-2 py-1">{o.un_at}</td>
-                <td className="px-2 py-1 text-right">{fmtNum(o.pedido_kg)}</td><td className="px-2 py-1 text-right">{fmtNum(o.pedido_pc)}</td><td className="px-2 py-1 text-right">{fmtNum(o.saldo_kg)}</td><td className="px-2 py-1 text-right">{fmtNum(o.saldo_pc)}</td><td className="px-2 py-1 text-right">{fmtNum(o.empenho_kg)}</td><td className="px-2 py-1 text-right">{fmtNum(o.empenho_pc)}</td>
-                <td className="px-2 py-1 text-right">{fmtNum(o.produzido_kg)}</td><td className="px-2 py-1 text-right">{fmtNum(o.produzido_pc)}</td><td className="px-2 py-1 text-right">{fmtNum(o.embalado_kg)}</td><td className="px-2 py-1 text-right">{fmtNum(o.embalado_pc)}</td><td className="px-2 py-1 text-right">{fmtNum(o.romaneio_kg)}</td><td className="px-2 py-1 text-right">{fmtNum(o.romaneio_pc)}</td>
-                <td className="px-2 py-1 text-right">{fmtNum(o.faturado_kg)}</td><td className="px-2 py-1 text-right">{fmtNum(o.faturado_pc)}</td><td className="px-2 py-1 text-right">{fmtNum(o.valor_pedido)}</td>
+                <td className="px-2 py-1 text-right">{fmtNum2(o.pedido_kg)}</td><td className="px-2 py-1 text-right">{fmtInt(o.pedido_pc)}</td><td className="px-2 py-1 text-right">{fmtNum2(o.saldo_kg)}</td><td className="px-2 py-1 text-right">{fmtInt(o.saldo_pc)}</td><td className="px-2 py-1 text-right">{fmtNum2(o.empenho_kg)}</td><td className="px-2 py-1 text-right">{fmtInt(o.empenho_pc)}</td>
+                <td className="px-2 py-1 text-right">{fmtNum2(o.produzido_kg)}</td><td className="px-2 py-1 text-right">{fmtInt(o.produzido_pc)}</td><td className="px-2 py-1 text-right">{fmtNum2(o.embalado_kg)}</td><td className="px-2 py-1 text-right">{fmtInt(o.embalado_pc)}</td><td className="px-2 py-1 text-right">{fmtNum2(o.romaneio_kg)}</td><td className="px-2 py-1 text-right">{fmtInt(o.romaneio_pc)}</td>
+                <td className="px-2 py-1 text-right">{fmtNum2(o.faturado_kg)}</td><td className="px-2 py-1 text-right">{fmtInt(o.faturado_pc)}</td><td className="px-2 py-1 text-right">{fmtNum2(o.valor_pedido)}</td>
               </tr>
             ))}
             {rows.length===0 && (
