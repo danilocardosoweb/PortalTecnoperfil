@@ -3,7 +3,43 @@
 @tailwind utilities;
 
 html, body, #root { height: 100%; }
-body { @apply bg-gray-50 text-gray-900; }
+
+/* Background gradient animado - Paleta vibrante com melhor contraste */
+body {
+  @apply text-gray-900;
+  background: linear-gradient(-45deg, #1a1a2e, #16213e, #0f3460, #533483, #e94560, #1a1a2e);
+  background-size: 400% 400%;
+  animation: gradient 20s ease infinite;
+}
+
+/* Esferas flutuantes de fundo */
+body::before, body::after {
+  content: '';
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  width: 500px;
+  height: 500px;
+  background: linear-gradient(135deg, #533483 0%, #e94560 100%);
+  top: -250px;
+  right: -250px;
+  animation: float 20s ease-in-out infinite;
+}
+
+body::after {
+  width: 600px;
+  height: 600px;
+  background: linear-gradient(135deg, #0f3460 0%, #533483 100%);
+  bottom: -300px;
+  left: -300px;
+  animation: float 25s ease-in-out infinite reverse;
+}
 
 /* Recorte da barra inferior do Power BI */
 .pbi-crop-wrapper{
@@ -19,6 +55,8 @@ body { @apply bg-gray-50 text-gray-900; }
   height: 110%; /* cobre melhor a barra inferior do Power BI */
   border: none;
   display: block;
+  background: white;
+  border-radius: 16px;
   /* altura e translateY são definidos inline para permitir ajuste dinâmico */
 }
 
@@ -29,4 +67,184 @@ body { @apply bg-gray-50 text-gray-900; }
   backface-visibility: hidden;
   transform: translateZ(0); /* ajuda alguns navegadores a evitar blur */
   filter: contrast(1.12) saturate(1.05);
+}
+
+/* Classes Liquid Glass - Ajustado para fundo escuro */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel-dark {
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+.glass-panel:hover {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.glass-button {
+  background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.08) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 15px 0 rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-button::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #533483, #e94560, #0f3460, #533483);
+  border-radius: inherit;
+  opacity: 0;
+  z-index: -1;
+  transition: opacity 0.3s ease;
+}
+
+.glass-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(233, 69, 96, 0.4);
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.1) 100%);
+}
+
+.glass-button:hover::before {
+  opacity: 0.4;
+}
+
+/* Glass button secundário - para links dentro das categorias */
+.glass-button-secondary {
+  background: linear-gradient(135deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.15) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 15px 0 rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-button-secondary::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #0f3460, #533483, #e94560, #0f3460);
+  border-radius: inherit;
+  opacity: 0;
+  z-index: -1;
+  transition: opacity 0.3s ease;
+}
+
+.glass-button-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(233, 69, 96, 0.3);
+  background: linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.2) 100%);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.glass-button-secondary:hover::before {
+  opacity: 0.2;
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.glass-input:focus {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(233, 69, 96, 0.6);
+  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2), inset 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+/* Animação de brilho */
+.glass-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transform: skewX(-15deg);
+  transition: left 0.5s ease;
+}
+
+.glass-shine:hover::after {
+  left: 100%;
+}
+
+/* Overlay gradient para elementos especiais */
+.gradient-overlay {
+  position: relative;
+  background: linear-gradient(135deg, 
+    rgba(139, 92, 246, 0.1) 0%, 
+    rgba(236, 72, 153, 0.1) 50%, 
+    rgba(59, 130, 246, 0.1) 100%);
+}
+
+/* Melhorias para sidebar auto-hide */
+.sidebar-trigger-hint {
+  transition: all 0.3s ease;
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { 
+    opacity: 0.3; 
+    transform: translateX(0);
+  }
+  50% { 
+    opacity: 0.6;
+    transform: translateX(3px);
+  }
+}
+
+/* Ajuste para scroll suave nas categorias expandidas */
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }

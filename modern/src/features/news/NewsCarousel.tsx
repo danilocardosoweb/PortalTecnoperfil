@@ -45,10 +45,10 @@ export function NewsCarousel(){
   const current=slides[idx]
   if(!current){
     return (
-      <div className="h-full flex items-center justify-center text-gray-400">
-        <div className="text-center">
-          <i className="fas fa-images text-4xl mb-2"/>
-          <p>Nenhuma notícia cadastrada.</p>
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center glass-panel p-8 rounded-2xl">
+          <i className="fas fa-images text-5xl mb-3 text-white"/>
+          <p className="text-white/80 font-medium">Nenhuma notícia cadastrada.</p>
         </div>
       </div>
     )
@@ -72,21 +72,21 @@ export function NewsCarousel(){
   }
 
   return (
-    <div className="relative h-full overflow-hidden bg-white">
+    <div className="relative h-full overflow-hidden rounded-xl">
       <div className="absolute inset-0">
-        <img src={current.imageUrl} alt={current.title||''} className="w-full h-full object-contain md:object-cover" onError={()=>handleImageError(current)}/>
+        <img src={current.imageUrl} alt={current.title||''} className="w-full h-full object-cover" onError={()=>handleImageError(current)}/>
       </div>
       {(current.title||current.subtitle) && (
-        <div className="absolute bottom-3 left-3 right-3 bg-black/40 text-white rounded p-3">
-          {current.title && <h3 className="text-lg font-semibold">{current.title}</h3>}
-          {current.subtitle && <p className="text-sm opacity-90">{current.subtitle}</p>}
-          {current.linkUrl && <a href={/^https?:\/\//i.test(current.linkUrl)?current.linkUrl:`https://${current.linkUrl}`} target="_blank" rel="noreferrer" className="inline-block mt-2 text-xs underline">Saiba mais</a>}
+        <div className="absolute bottom-4 left-4 right-4 glass-panel rounded-xl p-4">
+          {current.title && <h3 className="text-xl font-bold text-white drop-shadow-lg">{current.title}</h3>}
+          {current.subtitle && <p className="text-sm text-white/90 mt-1">{current.subtitle}</p>}
+          {current.linkUrl && <a href={/^https?:\/\//i.test(current.linkUrl)?current.linkUrl:`https://${current.linkUrl}`} target="_blank" rel="noreferrer" className="inline-block mt-3 px-4 py-2 glass-button rounded-lg text-white text-sm font-medium hover:scale-105 transition-all">Saiba mais</a>}
         </div>
       )}
       {slides.length>1 && (
-        <div className="absolute bottom-2 right-3 flex gap-1">
+        <div className="absolute top-4 right-4 flex gap-2 glass-panel px-3 py-2 rounded-full">
           {slides.map((_,i)=> (
-            <span key={i} className={`w-2 h-2 rounded-full ${i===idx? 'bg-white':'bg-white/50'}`}/>
+            <span key={i} className={`w-2 h-2 rounded-full transition-all ${i===idx? 'bg-white w-6':'bg-white/50'}`}/>
           ))}
         </div>
       )}
