@@ -100,56 +100,56 @@ function Header({onOpenSettings,onOpenAnalysis,onOpenAgent,onToggleSidebar,colla
             opacity: headerExpanded ? 1 : 0
           }}
         >
-          <header className="glass-panel flex items-center gap-3 px-6 h-16 mx-3 rounded-2xl relative z-10">
-            <button title={collapsed? 'Mostrar menu':'Recolher menu'} onClick={onToggleSidebar} className="glass-button glass-shine px-3 py-2 rounded-xl text-white">
+          <header className="glass-panel flex items-center gap-2 md:gap-3 px-3 md:px-6 h-14 md:h-16 mx-2 md:mx-3 rounded-xl md:rounded-2xl relative z-10">
+            <button title={collapsed? 'Mostrar menu':'Recolher menu'} onClick={onToggleSidebar} className="glass-button glass-shine px-2 md:px-3 py-2 rounded-lg md:rounded-xl text-white">
               <i className={`fa-solid fa-angles-${collapsed?'right':'left'}`}/>
             </button>
-            <div className="flex items-center gap-3">
-              <button onClick={()=>setShowLogoModal(true)} className="bg-white p-2 rounded-xl hover:scale-110 transition-all shadow-lg" title="Ver logo ampliado">
-                <img src="/logo-tecno.png" alt="Logo Tecnoperfil" className="h-8 w-8 object-contain cursor-pointer" />
+            <div className="flex items-center gap-2 md:gap-3">
+              <button onClick={()=>setShowLogoModal(true)} className="bg-white p-1.5 md:p-2 rounded-lg md:rounded-xl hover:scale-110 transition-all shadow-lg" title="Ver logo ampliado">
+                <img src="/logo-tecno.png" alt="Logo Tecnoperfil" className="h-6 md:h-8 w-6 md:w-8 object-contain cursor-pointer" />
               </button>
-              <div className="font-bold text-white text-lg drop-shadow-lg">TECNOPERFIL</div>
+              <div className="hidden sm:block font-bold text-white text-sm md:text-lg drop-shadow-lg">TECNOPERFIL</div>
             </div>
             <div className="flex-1" />
             <button 
               title={isFullscreen ? 'Sair da tela cheia (ESC)' : 'Tela cheia (F11)'} 
-              className="glass-button glass-shine px-3 py-2 rounded-xl text-white font-medium" 
+              className="glass-button glass-shine px-2 md:px-3 py-1.5 md:py-2 rounded-lg md:rounded-xl text-white font-medium text-sm md:text-base" 
               onClick={toggleFullscreen}
             >
               <i className={`fa-solid ${isFullscreen ? 'fa-compress' : 'fa-expand'}`}/>
             </button>
             <button 
               title={showcaseMode ? 'Desativar Modo Showcase' : 'Modo Showcase - Destacar imagem de fundo'} 
-              className={`glass-button glass-shine px-3 py-2 rounded-xl text-white font-medium ${showcaseMode ? 'bg-accent-pink/30' : ''}`}
+              className={`glass-button glass-shine px-2 md:px-3 py-1.5 md:py-2 rounded-lg md:rounded-xl text-white font-medium text-sm md:text-base ${showcaseMode ? 'bg-accent-pink/30' : ''}`}
               onClick={onToggleShowcase}
             >
               <i className={`fa-solid ${showcaseMode ? 'fa-eye-slash' : 'fa-image'}`}/>
             </button>
             {showcaseMode && (
-              <div className="glass-panel px-4 py-2 rounded-xl flex items-center gap-3" title="Ajustar transparência do conteúdo">
-                <i className="fa-solid fa-adjust text-white/70 text-sm"/>
+              <div className="glass-panel px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl flex items-center gap-2 md:gap-3" title="Ajustar transparência do conteúdo">
+                <i className="fa-solid fa-adjust text-white/70 text-xs md:text-sm"/>
                 <input 
                   type="range" 
                   min="0" 
                   max="100" 
                   value={showcaseOpacity * 100} 
                   onChange={(e)=> onOpacityChange(Number(e.target.value) / 100)}
-                  className="w-24 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                  className="w-16 md:w-24 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
                   style={{
                     background: `linear-gradient(to right, rgba(233,69,96,0.6) 0%, rgba(233,69,96,0.6) ${showcaseOpacity * 100}%, rgba(255,255,255,0.2) ${showcaseOpacity * 100}%, rgba(255,255,255,0.2) 100%)`
                   }}
                 />
-                <span className="text-white/70 text-xs font-mono min-w-[2.5rem]">{Math.round(showcaseOpacity * 100)}%</span>
+                <span className="hidden md:inline text-white/70 text-xs font-mono min-w-[2.5rem]">{Math.round(showcaseOpacity * 100)}%</span>
               </div>
             )}
-            <button title="Agente IA" className="glass-button glass-shine px-4 py-2 rounded-xl text-white font-medium" onClick={onOpenAgent}>
-              <i className="fa-solid fa-robot mr-2"/>Agente IA
+            <button title="Agente IA" className="glass-button glass-shine px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-white font-medium text-sm md:text-base" onClick={onOpenAgent}>
+              <i className="fa-solid fa-robot md:mr-2"/><span className="hidden md:inline">Agente IA</span>
             </button>
-            <button title="Análise" className="glass-button glass-shine px-4 py-2 rounded-xl text-white font-medium" onClick={onOpenAnalysis}>
-              <i className="fa-solid fa-table-list mr-2"/>Análise
+            <button title="Análise" className="glass-button glass-shine px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-white font-medium text-sm md:text-base" onClick={onOpenAnalysis}>
+              <i className="fa-solid fa-table-list md:mr-2"/><span className="hidden md:inline">Análise</span>
             </button>
-            <button title="Config" className="glass-button glass-shine ml-2 px-4 py-2 rounded-xl text-white font-medium" onClick={onOpenSettings}>
-              <i className="fa-solid fa-gear mr-2"/>Config
+            <button title="Config" className="glass-button glass-shine ml-1 md:ml-2 px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-white font-medium text-sm md:text-base" onClick={onOpenSettings}>
+              <i className="fa-solid fa-gear md:mr-2"/><span className="hidden md:inline">Config</span>
             </button>
           </header>
         </div>

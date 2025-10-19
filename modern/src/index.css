@@ -296,3 +296,60 @@ body::after { content: none; }
 .sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* ===== RESPONSIVIDADE MOBILE ===== */
+
+/* Smartphones (portrait) - até 640px */
+@media (max-width: 640px) {
+  /* Header trigger mais visível em mobile */
+  .glass-panel.px-4.py-1 {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  
+  /* Sidebar ocupa mais espaço em mobile quando expandido */
+  aside.glass-panel {
+    width: 85vw !important;
+    max-width: 280px;
+  }
+  
+  /* Ajustar altura dos containers em mobile */
+  .h-\[calc\(100vh-88px\)\],
+  .h-\[calc\(100vh-96px\)\] {
+    height: calc(100vh - 70px) !important;
+  }
+  
+  /* Botões menores em mobile */
+  .glass-button {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  /* Input de pesquisa responsivo */
+  input[type="text"].glass-input {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+/* Tablets (portrait) - 641px a 768px */
+@media (min-width: 641px) and (max-width: 768px) {
+  aside.glass-panel {
+    width: 240px !important;
+  }
+}
+
+/* Touch devices - aumentar área de toque */
+@media (hover: none) and (pointer: coarse) {
+  .glass-button,
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Trigger do header maior para facilitar toque */
+  .glass-panel.px-4.py-1 {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}
