@@ -46,7 +46,7 @@ function useLinks(){
 
 const normalize=(s:string)=> s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'')
 
-function Header({onOpenSettings,onOpenAnalysis,onOpenAgent,onToggleSidebar,collapsed}:{onOpenSettings:()=>void;onOpenAnalysis:()=>void;onOpenAgent:()=>void;onToggleSidebar:()=>void;collapsed:boolean}){
+function Header({onOpenSettings,onOpenAnalysis,onOpenAgent,onToggleSidebar,collapsed,showcaseMode,onToggleShowcase,showcaseOpacity,onOpacityChange}:{onOpenSettings:()=>void;onOpenAnalysis:()=>void;onOpenAgent:()=>void;onToggleSidebar:()=>void;collapsed:boolean;showcaseMode:boolean;onToggleShowcase:()=>void;showcaseOpacity:number;onOpacityChange:(v:number)=>void}){
   const [showLogoModal,setShowLogoModal]=useState(false)
   const [headerExpanded, setHeaderExpanded]=useState(false)
   const [isFullscreen, setIsFullscreen]=useState(false)
@@ -118,6 +118,30 @@ function Header({onOpenSettings,onOpenAnalysis,onOpenAgent,onToggleSidebar,colla
             >
               <i className={`fa-solid ${isFullscreen ? 'fa-compress' : 'fa-expand'}`}/>
             </button>
+            <button 
+              title={showcaseMode ? 'Desativar Modo Showcase' : 'Modo Showcase - Destacar imagem de fundo'} 
+              className={`glass-button glass-shine px-3 py-2 rounded-xl text-white font-medium ${showcaseMode ? 'bg-accent-pink/30' : ''}`}
+              onClick={onToggleShowcase}
+            >
+              <i className={`fa-solid ${showcaseMode ? 'fa-eye-slash' : 'fa-image'}`}/>
+            </button>
+            {showcaseMode && (
+              <div className="glass-panel px-4 py-2 rounded-xl flex items-center gap-3" title="Ajustar transparência do conteúdo">
+                <i className="fa-solid fa-adjust text-white/70 text-sm"/>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  value={showcaseOpacity * 100} 
+                  onChange={(e)=> onOpacityChange(Number(e.target.value) / 100)}
+                  className="w-24 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, rgba(233,69,96,0.6) 0%, rgba(233,69,96,0.6) ${showcaseOpacity * 100}%, rgba(255,255,255,0.2) ${showcaseOpacity * 100}%, rgba(255,255,255,0.2) 100%)`
+                  }}
+                />
+                <span className="text-white/70 text-xs font-mono min-w-[2.5rem]">{Math.round(showcaseOpacity * 100)}%</span>
+              </div>
+            )}
             <button title="Agente IA" className="glass-button glass-shine px-4 py-2 rounded-xl text-white font-medium" onClick={onOpenAgent}>
               <i className="fa-solid fa-robot mr-2"/>Agente IA
             </button>
@@ -377,6 +401,8 @@ function App(){
   const [showLogin,setShowLogin]=useState(false)
   const [isInitialLoad,setIsInitialLoad]=useState(true)
   const [defaultLinkLoaded,setDefaultLinkLoaded]=useState(false) // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [showcaseMode,setShowcaseMode]=useState(false)
+  const [showcaseOpacity,setShowcaseOpacity]=useState(0.15)
   const [authUser,setAuthUser]=useState<{id:string;username:string}|null>(()=>{
     try{ const s=sessionStorage.getItem('authUser'); return s? JSON.parse(s): null }catch{ return null }
   })
@@ -441,6 +467,42 @@ function App(){
   function toggleSidebar(){
     setSidebarCollapsed(v=>{ const nv=!v; localStorage.setItem('sidebarCollapsed', String(nv)); return nv })
   }
+  function toggleShowcase(){
+    setShowcaseMode(v=>!v)
+  }
+  
+  // Aplicar classes CSS no body baseado no modo showcase e URL atual
+  useEffect(()=>{
+    const body = document.body
+    // Modo showcase: painéis transparentes
+    if(showcaseMode){
+      body.classList.add('showcase-mode')
+      body.classList.remove('showcase-light')
+      // Aplicar opacidade customizada via CSS custom property
+      body.style.setProperty('--showcase-opacity', String(showcaseOpacity))
+      // Adicionar classe para ocultar containers quando opacidade é 0
+      if(showcaseOpacity === 0){
+        body.classList.add('opacity-zero')
+      } else {
+        body.classList.remove('opacity-zero')
+      }
+    } 
+    // Sem URL (NewsCarousel): overlay leve para destacar fundo
+    else if(!currentUrl){
+      body.classList.add('showcase-light')
+      body.classList.remove('showcase-mode', 'opacity-zero')
+      body.style.removeProperty('--showcase-opacity')
+    } 
+    // Com URL: overlay normal
+    else {
+      body.classList.remove('showcase-mode', 'showcase-light', 'opacity-zero')
+      body.style.removeProperty('--showcase-opacity')
+    }
+    return ()=> {
+      body.classList.remove('showcase-mode', 'showcase-light', 'opacity-zero')
+      body.style.removeProperty('--showcase-opacity')
+    }
+  },[showcaseMode, currentUrl, showcaseOpacity])
 
   return (
     <div className="h-screen flex flex-col relative">
@@ -450,7 +512,7 @@ function App(){
         }else{
           setOpenSettings(true)
         }
-      }} onOpenAnalysis={()=>setOpenAnalysis(true)} onOpenAgent={()=>setOpenAgent(true)} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} />
+      }} onOpenAnalysis={()=>setOpenAnalysis(true)} onOpenAgent={()=>setOpenAgent(true)} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} showcaseMode={showcaseMode} onToggleShowcase={toggleShowcase} showcaseOpacity={showcaseOpacity} onOpacityChange={setShowcaseOpacity} />
       <main className="flex flex-1 overflow-hidden relative">
         {/* Área de hover trigger quando collapsed */}
         {sidebarCollapsed && (

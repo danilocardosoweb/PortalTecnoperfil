@@ -4,42 +4,89 @@
 
 html, body, #root { height: 100%; }
 
-/* Background gradient animado - Paleta vibrante com melhor contraste */
+/* Fundo com imagem da empresa */
 body {
   @apply text-gray-900;
-  background: linear-gradient(-45deg, #1a1a2e, #16213e, #0f3460, #533483, #e94560, #1a1a2e);
-  background-size: 400% 400%;
-  animation: gradient 20s ease infinite;
+  background-image: url('/Tecnoperfil.png');
+  background-size: cover;           /* cobre toda a tela */
+  background-position: center;      /* centraliza a imagem */
+  background-repeat: no-repeat;     /* evita repetição */
+  background-attachment: fixed;     /* efeito parallax sutil */
+  position: relative;
 }
 
-/* Esferas flutuantes de fundo */
-body::before, body::after {
+/* Overlay dinâmico para melhorar contraste do conteúdo sobre a imagem */
+body::before {
   content: '';
   position: fixed;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.4;
-  pointer-events: none;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);   /* overlay padrão */
+  pointer-events: none;             /* não interfere com cliques */
   z-index: 0;
+  transition: background 0.5s ease; /* transição suave */
 }
 
-body::before {
-  width: 500px;
-  height: 500px;
-  background: linear-gradient(135deg, #533483 0%, #e94560 100%);
-  top: -250px;
-  right: -250px;
-  animation: float 20s ease-in-out infinite;
+/* Overlay leve quando não há conteúdo - destaca a imagem de fundo */
+body.showcase-light::before {
+  background: rgba(0, 0, 0, 0.1);   /* overlay bem leve */
 }
 
-body::after {
-  width: 600px;
-  height: 600px;
-  background: linear-gradient(135deg, #0f3460 0%, #533483 100%);
-  bottom: -300px;
-  left: -300px;
-  animation: float 25s ease-in-out infinite reverse;
+/* Modo Showcase - painéis ultra transparentes para destacar a imagem */
+body.showcase-mode .glass-panel {
+  background: rgba(255, 255, 255, 0.01) !important;
+  backdrop-filter: blur(4px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
+
+/* Containers de dashboard transparentes no modo showcase - opacidade controlável */
+body.showcase-mode .glass-panel iframe,
+body.showcase-mode .pbi-crop-iframe {
+  opacity: var(--showcase-opacity, 0.3) !important;
+  transition: opacity 0.5s ease;
+}
+
+/* NewsCarousel e NewsTicker também transparentes */
+body.showcase-mode .glass-panel > div {
+  opacity: calc(var(--showcase-opacity, 0.3) + 0.4) !important;
+  transition: opacity 0.5s ease;
+}
+
+/* Ocultar containers completamente quando opacidade é 0 - exceto controles */
+body.showcase-mode.opacity-zero main .glass-panel {
+  opacity: 0 !important;
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+}
+
+body.showcase-mode.opacity-zero aside.glass-panel {
+  opacity: 0 !important;
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+}
+
+/* Garantir que header e trigger permaneçam visíveis */
+body.showcase-mode.opacity-zero header.glass-panel,
+body.showcase-mode.opacity-zero header .glass-panel,
+body.showcase-mode.opacity-zero .sidebar-trigger-hint {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+body.showcase-mode::before {
+  background: rgba(0, 0, 0, 0.05);  /* overlay mínimo */
+}
+
+/* Garantir que o conteúdo fique acima do overlay */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* Esfera desativada */
+body::after { content: none; }
 
 /* Recorte da barra inferior do Power BI */
 .pbi-crop-wrapper{
@@ -90,7 +137,8 @@ body::after {
 .glass-panel:hover {
   background: rgba(255, 255, 255, 0.12);
   box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  transform: translateY(-2px);
+  /* Removido o "levantar" para evitar corte quando o container tem overflow hidden */
+  transform: none;
 }
 
 .glass-button {
