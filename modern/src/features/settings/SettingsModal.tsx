@@ -870,7 +870,7 @@ export function SettingsModal({open,onClose,currentUser}:{open:boolean;onClose:(
   }
 
   return (
-    <Modal open={open} title="Configurações" onClose={onClose}>
+    <Modal open={open} title="Configurações" onClose={onClose} size="large">
       <div className="sticky top-0 bg-white pb-3 z-10">
         <div className="flex gap-2 mb-3 flex-wrap">
           {tabs.map(t=>
@@ -1243,19 +1243,19 @@ export function SettingsModal({open,onClose,currentUser}:{open:boolean;onClose:(
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            className="glass-button-secondary px-3 py-1 text-xs text-gray-700 hover:text-gray-900"
+                            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white/95 border border-gray-200 text-gray-900 shadow-sm hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-300/60 transition"
                             onClick={()=>resetUserPassword(user.id)}
                             type="button"
                           >
-                            Redefinir senha
+                            <i className="fas fa-unlock-alt mr-2 text-blue-500" aria-hidden />Redefinir senha
                           </button>
                           <button
-                            className={`glass-button-secondary px-3 py-1 text-xs text-red-500 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed`}
+                            className={`px-4 py-1.5 text-xs font-semibold rounded-lg bg-white/95 border border-red-200 text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300/60 transition disabled:opacity-40 disabled:cursor-not-allowed`}
                             onClick={()=>deleteUser(user)}
                             disabled={isSelf}
                             type="button"
                           >
-                            Remover
+                            <i className="fas fa-trash-alt mr-2" aria-hidden />Remover
                           </button>
                         </div>
                       </td>
