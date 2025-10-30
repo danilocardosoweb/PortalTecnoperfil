@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Modal } from '../../components/Modal'
 import { collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, where, getDocs, serverTimestamp, setDoc, getDoc, updateDoc } from 'firebase/firestore'
 import { ref as stRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
@@ -6,13 +6,34 @@ import { db, storage } from '../../firebase'
 import * as XLSX from 'xlsx'
 import { supabase } from '../../supabase'
 import { processDocument } from '../agent/agentService.js'
+import type { AuthUser } from '../auth/LoginModal'
+import bcrypt from 'bcryptjs'
+
+type TabKey = 'geral'|'categorias'|'links'|'usuarios'|'carteira'|'uploads'|'documentos'|'news'
+
+type Role = {
+  id: string
+  name: string
+  description?: string | null
+  is_admin?: boolean | null
+}
+
+type PortalUser = {
+  id: string
+  email: string
+  full_name?: string | null
+  role_id?: string | null
+  is_active?: boolean | null
+  last_login?: string | null
+  role?: Role | null
+}
 
 type Category = { id: string; name: string; icon?: string; order?: number }
 type Link = { id: string; category: string; name: string; url: string; kind?: 'powerbi'|'external'; order?: number; isFavorite?: boolean }
 type Upload = { id: string; filename: string; sizeBytes: number; uploadedAt: any; storagePath?: string; downloadURL?: string }
 
-export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
-  const [tab,setTab]=useState<'geral'|'categorias'|'links'|'carteira'|'uploads'|'documentos'|'news'>('geral')
+export function SettingsModal({open,onClose,currentUser}:{open:boolean;onClose:()=>void;currentUser:AuthUser|null}){
+  const [tab,setTab]=useState<TabKey>('geral')
   
   // Categorias
   const [cats,setCats]=useState<Category[]>([])
@@ -37,6 +58,14 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
   const [pbiCropPct,setPbiCropPct]=useState<number>(Number(localStorage.getItem('pbiCropPct')||'7'))
   const [defaultLink,setDefaultLink]=useState('')
+  const [users,setUsers]=useState<PortalUser[]>([])
+  const [roles,setRoles]=useState<Role[]>([])
+  const [userLoading,setUserLoading]=useState(false)
+  const [roleLoading,setRoleLoading]=useState(false)
+  const [userSaving,setUserSaving]=useState(false)
+  const [userSearch,setUserSearch]=useState('')
+  const [userForm,setUserForm]=useState({ fullName:'', email:'', password:'', roleId:'' })
+  const [createExpanded,setCreateExpanded]=useState(false)
   
   // Edição inline
   const [editingCat,setEditingCat]=useState<string|null>(null)
@@ -68,6 +97,233 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
   const [tickerEnabled,setTickerEnabled]=useState(false)
   const [tickerItems,setTickerItems]=useState<string[]>([])
   const [tickerNew,setTickerNew]=useState('')
+
+  async function createUser(e: React.FormEvent){
+    e.preventDefault()
+    if(userSaving) return
+    const email=userForm.email.trim().toLowerCase()
+    const fullName=userForm.fullName.trim()
+    const password=userForm.password.trim()
+    const roleId=userForm.roleId || null
+    if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ alert('Informe um e-mail válido.'); return }
+    if(password.length<6){ alert('Senha deve conter pelo menos 6 caracteres.'); return }
+    if(users.some(u=>u.email?.toLowerCase()===email)){ alert('Já existe um usuário com este e-mail.'); return }
+    setUserSaving(true)
+    try{
+      const hash=bcrypt.hashSync(password, 10)
+      const { error } = await supabase
+        .from('users')
+        .insert({ email, full_name: fullName || null, password_hash: hash, role_id: roleId, is_active: true })
+      if(error) throw error
+      toast('Usuário criado com sucesso.','success')
+      setUserForm({ fullName:'', email:'', password:'', roleId: roles[0]?.id || '' })
+      setUserSearch('')
+      await loadUsers()
+    }catch(err){
+      console.error('Erro ao criar usuário:', err)
+      toast('Erro ao criar usuário.','error')
+    }finally{
+      setUserSaving(false)
+    }
+  }
+
+  async function updateUserRole(userId:string, roleId:string){
+    try{
+      const { error } = await supabase
+        .from('users')
+        .update({ role_id: roleId || null })
+        .eq('id', userId)
+      if(error) throw error
+      toast('Perfil atualizado.','success')
+      await loadUsers()
+    }catch(err){
+      console.error('Erro ao atualizar perfil:', err)
+      toast('Falha ao atualizar perfil.','error')
+    }
+  }
+
+  async function toggleUserActive(user: PortalUser){
+    const next = !user.is_active
+    if(user.id===currentUser?.id && !next){
+      alert('Você não pode desativar o próprio acesso.')
+      return
+    }
+    try{
+      const { error } = await supabase
+        .from('users')
+        .update({ is_active: next })
+        .eq('id', user.id)
+      if(error) throw error
+      toast(next?'Usuário ativado.':'Usuário desativado.','success')
+      await loadUsers()
+    }catch(err){
+      console.error('Erro ao alterar status:', err)
+      toast('Falha ao alterar status do usuário.','error')
+    }
+  }
+
+  async function resetUserPassword(userId:string){
+    const novaSenha = prompt('Informe a nova senha (mínimo 6 caracteres):')
+    if(!novaSenha) return
+    if(novaSenha.trim().length<6){ alert('A senha deve conter pelo menos 6 caracteres.'); return }
+    try{
+      const hash = bcrypt.hashSync(novaSenha.trim(), 10)
+      const { error } = await supabase
+        .from('users')
+        .update({ password_hash: hash })
+        .eq('id', userId)
+      if(error) throw error
+      toast('Senha redefinida.','success')
+    }catch(err){
+      console.error('Erro ao redefinir senha:', err)
+      toast('Falha ao redefinir senha.','error')
+    }
+  }
+
+  async function deleteUser(user: PortalUser){
+    if(user.id===currentUser?.id){
+      alert('Você não pode remover o próprio usuário.')
+      return
+    }
+    if(!confirm(`Remover usuário ${user.email}? Esta ação não pode ser desfeita.`)) return
+    try{
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', user.id)
+      if(error) throw error
+      toast('Usuário removido.','success')
+      await loadUsers()
+    }catch(err){
+      console.error('Erro ao remover usuário:', err)
+      toast('Falha ao remover usuário.','error')
+    }
+  }
+
+  // Verificar se o usuário atual é administrador
+  const isAdmin = currentUser?.isAdmin || false
+  
+  // Debug: Verificar permissões do usuário
+  useEffect(() => {
+    console.log('[Gerenciamento] usuário atual:', {
+      email: currentUser?.email,
+      isAdmin: currentUser?.isAdmin,
+      roleId: currentUser?.roleId,
+      roleName: currentUser?.roleName
+    })
+  }, [currentUser])
+
+  const tabLabels: Record<TabKey,string> = {
+    geral: 'Geral',
+    categorias: 'Categorias',
+    links: 'Links do Power BI',
+    usuarios: 'Gerenciamento de Usuários',
+    carteira: 'Carteira de Encomendas',
+    uploads: 'Uploads',
+    documentos: 'Documentos IA',
+    news: 'News'
+  }
+
+  const tabs = useMemo<TabKey[]>(()=>{
+    const order: TabKey[] = ['geral','categorias','links','usuarios','carteira','uploads','documentos','news']
+    return isAdmin ? order : order.filter(t=>t!=='usuarios')
+  },[isAdmin])
+
+  const filteredUsers = useMemo(()=>{
+    const term = userSearch.trim().toLowerCase()
+    if(!term) return users
+    return users.filter(u=>{
+      const fullName = (u.full_name||'').toLowerCase()
+      const email = (u.email||'').toLowerCase()
+      const roleName = (u.role?.name||'').toLowerCase()
+      return fullName.includes(term) || email.includes(term) || roleName.includes(term)
+    })
+  },[userSearch, users])
+
+  const userStats = useMemo(()=>{
+    const total = users.length
+    const active = users.filter(u=>u.is_active !== false).length
+    const admins = users.filter(u=>{
+      const roleData = u.role || roles.find(r=>r.id === u.role_id) || null
+      return !!roleData?.is_admin
+    }).length
+    return {
+      total,
+      active,
+      inactive: Math.max(total - active, 0),
+      admins
+    }
+  },[users, roles])
+
+  const loadRoles = useCallback(async () => {
+    setRoleLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('roles')
+        .select('id,name,description,is_admin')
+        .order('name', { ascending: true })
+      if (error) throw error
+      const list = data || []
+      setRoles(list)
+      return list
+    } catch (err) {
+      console.error('Erro ao carregar perfis:', err)
+      toast('Erro ao carregar perfis de acesso.','error')
+      return [] as Role[]
+    } finally {
+      setRoleLoading(false)
+    }
+  },[])
+
+  const loadUsers = useCallback(async (roleSource?: Role[])=>{
+    setUserLoading(true)
+    try{
+      const { data, error } = await supabase
+        .from('users')
+        .select('id,email,full_name,is_active,role_id,last_login')
+        .order('email', { ascending: true })
+      if(error) throw error
+
+      console.log('[Gerenciamento] usuários retornados:', data?.length, data)
+
+      const roleList = roleSource && roleSource.length ? roleSource : (roles.length ? roles : await loadRoles())
+      const roleMap = new Map((roleList||[]).map(r=>[r.id, r]))
+
+      console.log('[Gerenciamento] papéis em cache:', roleList?.length, roleList)
+
+      const normalized: PortalUser[] = (data||[]).map((u:any)=>{
+        const roleData = u.role_id ? roleMap.get(u.role_id) || null : null
+        return {
+          id: u.id,
+          email: u.email,
+          full_name: u.full_name,
+          is_active: u.is_active,
+          role_id: u.role_id,
+          last_login: u.last_login,
+          role: roleData
+        }
+      })
+      console.log('[Gerenciamento] usuários normalizados:', normalized)
+      setUsers(normalized)
+    }catch(err){
+      console.error('Erro ao carregar usuários:', err)
+      toast('Erro ao carregar usuários.','error')
+    }finally{
+      setUserLoading(false)
+    }
+  },[roles, loadRoles])
+
+  useEffect(()=>{
+    if(open && tab==='usuarios' && isAdmin){
+      setUserSearch('')
+    }
+  },[open, tab, isAdmin])
+
+  useEffect(()=>{
+    if(!isAdmin && tab==='usuarios'){
+      setTab('geral')
+    }
+  },[isAdmin, tab])
 
   useEffect(()=>{
     if(!open) return
@@ -136,8 +392,24 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
       loadDocuments()
     }
     
+    if(open && tab==='usuarios' && isAdmin){
+      let isCancelled=false
+      const execute=async()=>{
+        const roleList = roles.length ? roles : await loadRoles()
+        if(isCancelled) return
+        await loadUsers(roleList)
+      }
+      execute()
+      return ()=>{ isCancelled=true }
+    }
     return ()=>{ unsubCats(); unsubLinks(); unsubUploads(); unsubNews(); unsubTicker(); }
-  },[open,tab])
+  },[open,tab,isAdmin,roles,loadRoles,loadUsers])
+
+  useEffect(()=>{
+    if(roles.length && !userForm.roleId){
+      setUserForm(prev=>({...prev, roleId: prev.roleId || roles[0]?.id || ''}))
+    }
+  },[roles, userForm.roleId])
 
   useEffect(()=>{ if(cats.length && !linkCat) setLinkCat(cats[0].name) },[cats])
 
@@ -601,16 +873,28 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
     <Modal open={open} title="Configurações" onClose={onClose}>
       <div className="sticky top-0 bg-white pb-3 z-10">
         <div className="flex gap-2 mb-3 flex-wrap">
-          {(['geral','categorias','links','carteira','uploads','documentos','news'] as const).map(t=>
-            <button key={t} onClick={()=>setTab(t)} className={`px-3 py-1 rounded-full border ${tab===t?'bg-blue-600 text-white border-blue-600':'hover:border-blue-400'}`}>{
-              t==='geral'?'Geral':t==='categorias'?'Categorias':t==='links'?'Links do Power BI':t==='carteira'?'Carteira de Encomendas':t==='uploads'?'Uploads':t==='documentos'?'Documentos IA':'News'
-            }</button>
+          {tabs.map(t=>
+            <button
+              key={t}
+              onClick={()=>setTab(t)}
+              className={`px-3 py-1 rounded-full border transition ${tab===t?'bg-blue-600 text-white border-blue-600':'hover:border-blue-400'}`}
+            >
+              {tabLabels[t]}
+            </button>
           )}
         </div>
       </div>
 
       {tab==='geral' && (
         <div className="space-y-3">
+          {currentUser && (
+            <div className="p-4 rounded-xl border border-blue-100 bg-blue-50 text-sm text-blue-900">
+              <div className="font-semibold text-blue-700 mb-1">Sessão atual</div>
+              <div><strong>Nome:</strong> {currentUser.fullName || '—'}</div>
+              <div><strong>E-mail:</strong> {currentUser.email}</div>
+              <div><strong>Perfil:</strong> {currentUser.roleName || (currentUser.isAdmin ? 'Administrador' : 'Usuário')}</div>
+            </div>
+          )}
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={darkMode} onChange={e=>setDarkMode(e.target.checked)}/>
             Tema escuro (black & white)
@@ -742,6 +1026,256 @@ export function SettingsModal({open,onClose}:{open:boolean;onClose:()=>void}){
           </div>
         </div>
       )}
+
+      {tab==='usuarios' && isAdmin && (
+        <div className="space-y-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="glass-panel rounded-2xl px-4 py-3 border border-gray-200/70 bg-white/90 text-gray-900 flex items-center gap-3 shadow-sm">
+              <div className="bg-gray-200/80 rounded-2xl h-12 w-12 flex items-center justify-center text-gray-700">
+                <i className="fas fa-users text-lg" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500">Total</p>
+                <p className="text-2xl font-semibold text-gray-900">{userStats.total}</p>
+              </div>
+            </div>
+            <div className="glass-panel rounded-2xl px-4 py-3 border border-emerald-200/70 bg-white/90 text-gray-900 flex items-center gap-3 shadow-sm">
+              <div className="bg-emerald-500/20 text-emerald-600 rounded-2xl h-12 w-12 flex items-center justify-center">
+                <i className="fas fa-user-check text-lg" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-emerald-600/80">Ativos</p>
+                <p className="text-2xl font-semibold text-gray-900">{userStats.active}</p>
+              </div>
+            </div>
+            <div className="glass-panel rounded-2xl px-4 py-3 border border-amber-200/70 bg-white/90 text-gray-900 flex items-center gap-3 shadow-sm">
+              <div className="bg-amber-500/20 text-amber-600 rounded-2xl h-12 w-12 flex items-center justify-center">
+                <i className="fas fa-user-clock text-lg" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-amber-600/80">Pendentes</p>
+                <p className="text-2xl font-semibold text-gray-900">{userStats.inactive}</p>
+              </div>
+            </div>
+            <div className="glass-panel rounded-2xl px-4 py-3 border border-indigo-200/70 bg-white/90 text-gray-900 flex items-center gap-3 shadow-sm">
+              <div className="bg-indigo-500/20 text-indigo-600 rounded-2xl h-12 w-12 flex items-center justify-center">
+                <i className="fas fa-user-shield text-lg" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-indigo-600/80">Administradores</p>
+                <p className="text-2xl font-semibold text-gray-900">{userStats.admins}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-panel p-4 rounded-2xl border border-blue-100 shadow-sm bg-white/95 text-gray-900">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-gray-900">Criar novo usuário</h3>
+              <button
+                type="button"
+                onClick={()=>setCreateExpanded(prev=>!prev)}
+                className="h-8 w-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 transition"
+                aria-label={createExpanded ? 'Recolher formulário' : 'Expandir formulário'}
+              >
+                <i className={`fas fa-chevron-${createExpanded ? 'up' : 'down'} text-sm`} />
+              </button>
+            </div>
+            <form
+              className={`grid md:grid-cols-2 gap-3 transition-all duration-300 ease-in-out ${createExpanded? 'opacity-100 max-h-[1200px]' : 'opacity-0 max-h-0 pointer-events-none overflow-hidden'}`}
+              onSubmit={createUser}
+            >
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo</label>
+                <input
+                  type="text"
+                  value={userForm.fullName}
+                  onChange={e=>setUserForm(prev=>({...prev, fullName: e.target.value }))}
+                  className="glass-input w-full text-gray-900 placeholder:text-gray-400"
+                  placeholder="Ex.: Maria Souza"
+                />
+              </div>
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">E-mail corporativo</label>
+                <input
+                  type="email"
+                  value={userForm.email}
+                  onChange={e=>setUserForm(prev=>({...prev, email: e.target.value }))}
+                  className="glass-input w-full text-gray-900 placeholder:text-gray-400"
+                  placeholder="usuario@empresa.com"
+                  required
+                />
+              </div>
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Senha provisória</label>
+                <input
+                  type="password"
+                  value={userForm.password}
+                  onChange={e=>setUserForm(prev=>({...prev, password: e.target.value }))}
+                  className="glass-input w-full text-gray-900 placeholder:text-gray-400"
+                  placeholder="mínimo 6 caracteres"
+                  required
+                  autoComplete="new-password"
+                />
+                <p className="text-xs text-gray-600 mt-1">Informe uma senha inicial; o usuário pode alterá-la depois.</p>
+              </div>
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Perfil de acesso</label>
+                <select
+                  value={userForm.roleId}
+                  onChange={e=>setUserForm(prev=>({...prev, roleId: e.target.value }))}
+                  className="glass-input w-full text-gray-900"
+                  required
+                >
+                  {roles.map(role=>(
+                    <option key={role.id} value={role.id}>{role.name}{role.is_admin ? ' (Administrador)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-2 flex justify-end">
+                <button
+                  type="submit"
+                  className="glass-button px-5 py-2 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={userSaving}
+                >
+                  {userSaving ? <><i className="fas fa-spinner fa-spin mr-2"/>Salvando...</> : <><i className="fas fa-user-plus mr-2"/>Criar usuário</>}
+                </button>
+              </div>
+            </form>
+            {!createExpanded && (
+              <div className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                <i className="fas fa-info-circle" />
+                Formulário oculto. Clique no ícone para expandir.
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
+            <div className="relative md:w-72">
+              <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+              <input
+                type="text"
+                placeholder="Filtrar por nome, e-mail ou perfil"
+                value={userSearch}
+                onChange={e=>setUserSearch(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 rounded-2xl border border-gray-300 bg-white/95 text-gray-900 placeholder:text-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
+              />
+            </div>
+            <div className="ml-auto text-sm text-gray-600">
+              {userLoading ? 'Carregando usuários...' : `${filteredUsers.length} usuário(s)`}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-gray-200/80 glass-panel bg-white/95 text-gray-900">
+            <table className="min-w-full text-sm text-gray-900">
+              <thead className="text-left uppercase text-gray-500 text-xs">
+                <tr>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">E-mail</th>
+                  <th className="px-4 py-3">Perfil</th>
+                  <th className="px-4 py-3">Último acesso</th>
+                  <th className="px-4 py-3 text-center">Ativo</th>
+                  <th className="px-4 py-3 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.length === 0 && !userLoading && (
+                  <tr>
+                    <td colSpan={6} className="text-center text-gray-500 py-6">
+                      Nenhum usuário encontrado.
+                    </td>
+                  </tr>
+                )}
+
+                {filteredUsers.map(user=>{
+                  const role = user.role || roles.find(r=>r.id===user.role_id) || null
+                  const isSelf = user.id === currentUser?.id
+                  return (
+                    <tr key={user.id} className="border-t border-gray-200/70 hover:bg-gray-50 transition">
+                      <td className="px-4 py-3 font-medium text-gray-900">{user.full_name || '—'}</td>
+                      <td className="px-4 py-3 text-gray-700">{user.email}</td>
+                      <td className="px-4 py-3">
+                        <select
+                          value={user.role_id || ''}
+                          onChange={async e=>{
+                            try{
+                              const { error } = await supabase
+                                .from('users')
+                                .update({ role_id: e.target.value || null })
+                                .eq('id', user.id)
+                              if(error) throw error
+                              toast('Perfil atualizado.','success')
+                              await loadUsers()
+                            }catch(err){
+                              console.error('Erro ao atualizar perfil:', err)
+                              toast('Falha ao atualizar perfil.','error')
+                            }
+                          }}
+                          className="glass-input text-gray-900"
+                        >
+                          <option value="">Sem perfil</option>
+                          {roles.map(roleOption=>(
+                            <option key={roleOption.id} value={roleOption.id}>{roleOption.name}{roleOption.is_admin ? ' (Administrador)' : ''}</option>
+                          ))}
+                        </select>
+                        {role && (
+                          <span className={`inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-full text-xs font-medium ${role.is_admin ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-700'}`}>
+                            <i className={`fas ${role.is_admin ? 'fa-shield-alt' : 'fa-id-badge'}`} />
+                            {role.name}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {user.last_login ? new Date(user.last_login).toLocaleString('pt-BR') : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <label className="inline-flex items-center gap-2 text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={user.is_active !== false}
+                            onChange={()=>toggleUserActive(user)}
+                            disabled={isSelf}
+                          />
+                          <span className={user.is_active !== false ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>
+                            {user.is_active !== false ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </label>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            className="glass-button-secondary px-3 py-1 text-xs text-gray-700 hover:text-gray-900"
+                            onClick={()=>resetUserPassword(user.id)}
+                            type="button"
+                          >
+                            Redefinir senha
+                          </button>
+                          <button
+                            className={`glass-button-secondary px-3 py-1 text-xs text-red-500 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed`}
+                            onClick={()=>deleteUser(user)}
+                            disabled={isSelf}
+                            type="button"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+
+                {userLoading && (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-gray-500">
+                      <i className="fas fa-spinner fa-spin mr-2"/>Carregando usuários...
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {tab==='categorias' && (
         <div className="space-y-3">
           <div className="grid md:grid-cols-[1fr_220px_auto] gap-2 sticky top-0 bg-white pb-2">

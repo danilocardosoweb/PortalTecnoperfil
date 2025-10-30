@@ -4,7 +4,7 @@ import './index.css'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { collection, onSnapshot, orderBy, query, doc, getDoc } from 'firebase/firestore'
 import { db } from './firebase'
-import { LoginModal } from './features/auth/LoginModal'
+import { LoginModal, AuthUser } from './features/auth/LoginModal'
 import { SettingsModal } from './features/settings/SettingsModal'
 import { AnalysisModal } from './features/orders/AnalysisModal'
 import { AgentModal } from './features/agent/AgentModal'
@@ -46,7 +46,7 @@ function useLinks(){
 
 const normalize=(s:string)=> s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'')
 
-function Header({onOpenSettings,onOpenAnalysis,onOpenAgent,onToggleSidebar,collapsed,showcaseMode,onToggleShowcase,showcaseOpacity,onOpacityChange}:{onOpenSettings:()=>void;onOpenAnalysis:()=>void;onOpenAgent:()=>void;onToggleSidebar:()=>void;collapsed:boolean;showcaseMode:boolean;onToggleShowcase:()=>void;showcaseOpacity:number;onOpacityChange:(v:number)=>void}){
+function Header({authUser,onLogout,onOpenSettings,onOpenAnalysis,onOpenAgent,onToggleSidebar,collapsed,showcaseMode,onToggleShowcase,showcaseOpacity,onOpacityChange}:{authUser:AuthUser|null;onLogout:()=>void;onOpenSettings:()=>void;onOpenAnalysis:()=>void;onOpenAgent:()=>void;onToggleSidebar:()=>void;collapsed:boolean;showcaseMode:boolean;onToggleShowcase:()=>void;showcaseOpacity:number;onOpacityChange:(v:number)=>void}){
   const [showLogoModal,setShowLogoModal]=useState(false)
   const [headerExpanded, setHeaderExpanded]=useState(false)
   const [isFullscreen, setIsFullscreen]=useState(false)
@@ -106,10 +106,22 @@ function Header({onOpenSettings,onOpenAnalysis,onOpenAgent,onToggleSidebar,colla
             </button>
             <div className="flex items-center gap-2 md:gap-3">
               <button onClick={()=>setShowLogoModal(true)} className="bg-white p-1.5 md:p-2 rounded-lg md:rounded-xl hover:scale-110 transition-all shadow-lg" title="Ver logo ampliado">
-                <img src="/logo-tecno.png" alt="Logo Tecnoperfil" className="h-6 md:h-8 w-6 md:w-8 object-contain cursor-pointer" />
+                <img src="/logo-tecno2.png" alt="Logo Tecnoperfil" className="h-6 md:h-8 w-6 md:w-8 object-contain cursor-pointer" />
               </button>
               <div className="hidden sm:block font-bold text-white text-sm md:text-lg drop-shadow-lg">TECNOPERFIL</div>
             </div>
+            {authUser && (
+              <div className="hidden md:flex items-center gap-3 text-white ml-2">
+                <div className="text-right leading-tight text-sm font-semibold drop-shadow-lg">
+                  {(() => {
+                    const hour = new Date().getHours()
+                    if(hour >= 5 && hour < 12) return 'Bom dia'
+                    if(hour >= 12 && hour < 18) return 'Boa tarde'
+                    return 'Boa noite'
+                  })()}, {authUser.fullName || authUser.email}
+                </div>
+              </div>
+            )}
             <div className="flex-1" />
             <button 
               title={isFullscreen ? 'Sair da tela cheia (ESC)' : 'Tela cheia (F11)'} 
@@ -151,6 +163,11 @@ function Header({onOpenSettings,onOpenAnalysis,onOpenAgent,onToggleSidebar,colla
             <button title="Config" className="glass-button glass-shine ml-1 md:ml-2 px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-white font-medium text-sm md:text-base" onClick={onOpenSettings}>
               <i className="fa-solid fa-gear md:mr-2"/><span className="hidden md:inline">Config</span>
             </button>
+            {authUser && (
+              <button title="Sair" onClick={onLogout} className="glass-button glass-shine ml-1 md:ml-2 px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-white font-medium text-sm md:text-base">
+                <i className="fa-solid fa-right-from-bracket md:mr-2"/><span className="hidden md:inline">Sair</span>
+              </button>
+            )}
           </header>
         </div>
       </div>
@@ -282,7 +299,7 @@ function Sidebar({onSelect,currentUrl,collapsed}:{onSelect:(link:Link)=>void;cur
                 src="/logo-danilo.png"
                 srcSet="/logo-danilo.png 1x, /logo-danilo@2x.png 2x"
                 sizes="(max-width: 640px) 120px, 160px"
-                alt="Logo Danilo"
+                alt="Logo Danilo Cardoso"
                 className="h-20 w-auto object-contain logo-clarity"
                 decoding="async"
                 loading="eager"
@@ -398,14 +415,24 @@ function App(){
   const [openAnalysis,setOpenAnalysis]=useState(false)
   const [openAgent,setOpenAgent]=useState(false)
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
-  const [showLogin,setShowLogin]=useState(false)
   const [isInitialLoad,setIsInitialLoad]=useState(true)
   const [defaultLinkLoaded,setDefaultLinkLoaded]=useState(false) // eslint-disable-line @typescript-eslint/no-unused-vars
   const [showcaseMode,setShowcaseMode]=useState(false)
   const [showcaseOpacity,setShowcaseOpacity]=useState(0.15)
-  const [authUser,setAuthUser]=useState<{id:string;username:string}|null>(()=>{
-    try{ const s=sessionStorage.getItem('authUser'); return s? JSON.parse(s): null }catch{ return null }
+  const [authUser,setAuthUser]=useState<AuthUser|null>(()=>{
+    try{
+      const stored=sessionStorage.getItem('authUser')
+      if(!stored) return null
+      const parsed=JSON.parse(stored)
+      if(parsed && typeof parsed==='object' && 'id' in parsed && 'email' in parsed){
+        return parsed as AuthUser
+      }
+      return null
+    }catch{
+      return null
+    }
   })
+  const [showLogin,setShowLogin]=useState(()=> (sessionStorage.getItem('authUser') ? false : true))
   // Carregar link padrão e deep-link
   useEffect(()=>{
     // Marca que o carregamento inicial terminou após um pequeno delay
@@ -504,16 +531,28 @@ function App(){
     }
   },[showcaseMode, currentUrl, showcaseOpacity])
 
+  function handleLogout(){
+    setAuthUser(null)
+    sessionStorage.removeItem('authUser')
+    setOpenSettings(false)
+  }
+
+  useEffect(()=>{
+    if(!authUser){
+      setShowLogin(true)
+    }
+  },[authUser])
+
   return (
     <div className="h-screen flex flex-col relative">
-      <Header onOpenSettings={()=>{
+      <Header authUser={authUser} onLogout={handleLogout} onOpenSettings={()=>{
         if(!authUser){
           setShowLogin(true)
         }else{
           setOpenSettings(true)
         }
       }} onOpenAnalysis={()=>setOpenAnalysis(true)} onOpenAgent={()=>setOpenAgent(true)} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} showcaseMode={showcaseMode} onToggleShowcase={toggleShowcase} showcaseOpacity={showcaseOpacity} onOpacityChange={setShowcaseOpacity} />
-      <main className="flex flex-1 overflow-hidden relative">
+      <main className={`flex flex-1 overflow-hidden relative ${authUser ? '' : 'select-none'}`}>
         {/* Área de hover trigger quando collapsed */}
         {sidebarCollapsed && (
           <div 
@@ -550,9 +589,15 @@ function App(){
               </div>
             )}
         </section>
+        {!authUser && (
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm text-white gap-4">
+            <p className="text-center text-lg font-semibold">Faça login para acessar o Portal TecnoPerfil.</p>
+            <button onClick={()=>setShowLogin(true)} className="glass-button glass-shine px-6 py-3 rounded-2xl text-white font-semibold">Entrar agora</button>
+          </div>
+        )}
       </main>
-      <SettingsModal open={openSettings} onClose={()=>setOpenSettings(false)} />
-      <LoginModal open={showLogin} onClose={()=>setShowLogin(false)} onSuccess={(u)=>{ setAuthUser(u); sessionStorage.setItem('authUser', JSON.stringify(u)); setShowLogin(false); setOpenSettings(true) }} />
+      <SettingsModal open={openSettings} onClose={()=>setOpenSettings(false)} currentUser={authUser} />
+      <LoginModal open={showLogin} onClose={()=>{ if(authUser) setShowLogin(false) }} onSuccess={(u)=>{ setAuthUser(u); sessionStorage.setItem('authUser', JSON.stringify(u)); setShowLogin(false); setOpenSettings(false) }} />
       <AnalysisModal open={openAnalysis} onClose={()=>setOpenAnalysis(false)} />
       <AgentModal open={openAgent} onClose={()=>setOpenAgent(false)} />
     </div>

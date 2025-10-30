@@ -3,7 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 import mammoth from 'mammoth'
 import Papa from 'papaparse'
 
-const OPENROUTER_API_KEY = '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'
+const OPENROUTER_API_KEY = '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'
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
 
 type AgentType = 'pcp' | 'comercial' | 'producao' | 'ferramentaria'
