@@ -160,9 +160,11 @@ function Header({authUser,onLogout,onOpenSettings,onOpenAnalysis,onOpenAgent,onT
             <button title="Análise" className="glass-button glass-shine px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-white font-medium text-sm md:text-base" onClick={onOpenAnalysis}>
               <i className="fa-solid fa-table-list md:mr-2"/><span className="hidden md:inline">Análise</span>
             </button>
-            <button title="Config" className="glass-button glass-shine ml-1 md:ml-2 px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-white font-medium text-sm md:text-base" onClick={onOpenSettings}>
-              <i className="fa-solid fa-gear md:mr-2"/><span className="hidden md:inline">Config</span>
-            </button>
+            {authUser?.isAdmin && (
+              <button title="Config" className="glass-button glass-shine ml-1 md:ml-2 px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-white font-medium text-sm md:text-base" onClick={()=> authUser?.isAdmin && onOpenSettings()}>
+                <i className="fa-solid fa-gear md:mr-2"/><span className="hidden md:inline">Config</span>
+              </button>
+            )}
             {authUser && (
               <button title="Sair" onClick={onLogout} className="glass-button glass-shine ml-1 md:ml-2 px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-white font-medium text-sm md:text-base">
                 <i className="fa-solid fa-right-from-bracket md:mr-2"/><span className="hidden md:inline">Sair</span>
@@ -417,8 +419,10 @@ function App(){
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
   const [isInitialLoad,setIsInitialLoad]=useState(true)
   const [defaultLinkLoaded,setDefaultLinkLoaded]=useState(false) // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [initialLinkChecked,setInitialLinkChecked]=useState(false)
   const [showcaseMode,setShowcaseMode]=useState(false)
   const [showcaseOpacity,setShowcaseOpacity]=useState(0.15)
+  const links=useLinks()
   const [authUser,setAuthUser]=useState<AuthUser|null>(()=>{
     try{
       const stored=sessionStorage.getItem('authUser')
@@ -437,7 +441,7 @@ function App(){
   useEffect(()=>{
     // Marca que o carregamento inicial terminou após um pequeno delay
     const timer = setTimeout(()=> setIsInitialLoad(false), 100)
-    
+
     if(location.hash){
       try{ setCurrentUrl(decodeURIComponent(location.hash.slice(1))) }catch{}
       setDefaultLinkLoaded(true)
@@ -462,6 +466,18 @@ function App(){
     
     return ()=> clearTimeout(timer)
   },[])
+
+  useEffect(()=>{
+    if(!defaultLinkLoaded || initialLinkChecked || !links.length) return
+    const hasCurrent = currentUrl && links.some(l=>l.url===currentUrl)
+    if(!hasCurrent){
+      const resumeLink = links.find(l=> normalize(l.name)==='resumo')
+      if(resumeLink){
+        setCurrentUrl(resumeLink.url)
+      }
+    }
+    setInitialLinkChecked(true)
+  },[defaultLinkLoaded, links, currentUrl, initialLinkChecked])
   // Salvar URL no hash apenas para Power BI (não para links externos)
   useEffect(()=>{ 
     if(currentUrl){
@@ -480,6 +496,7 @@ function App(){
     
     // Listener para abrir configurações em aba específica
     const handleOpenSettings = (e: any) => {
+      if(!authUser?.isAdmin) return
       try{
         if(e && typeof e.detail === 'string'){
           localStorage.setItem('settingsPreferredTab', e.detail)
@@ -490,7 +507,13 @@ function App(){
     
     window.addEventListener('openSettings', handleOpenSettings)
     return () => window.removeEventListener('openSettings', handleOpenSettings)
-  },[])
+  },[authUser])
+
+  useEffect(()=>{
+    if(!authUser?.isAdmin && openSettings){
+      setOpenSettings(false)
+    }
+  },[authUser, openSettings])
   function toggleSidebar(){
     setSidebarCollapsed(v=>{ const nv=!v; localStorage.setItem('sidebarCollapsed', String(nv)); return nv })
   }
@@ -545,13 +568,7 @@ function App(){
 
   return (
     <div className="h-screen flex flex-col relative">
-      <Header authUser={authUser} onLogout={handleLogout} onOpenSettings={()=>{
-        if(!authUser){
-          setShowLogin(true)
-        }else{
-          setOpenSettings(true)
-        }
-      }} onOpenAnalysis={()=>setOpenAnalysis(true)} onOpenAgent={()=>setOpenAgent(true)} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} showcaseMode={showcaseMode} onToggleShowcase={toggleShowcase} showcaseOpacity={showcaseOpacity} onOpacityChange={setShowcaseOpacity} />
+      <Header authUser={authUser} onLogout={handleLogout} onOpenSettings={()=> authUser?.isAdmin && setOpenSettings(true)} onOpenAnalysis={()=>setOpenAnalysis(true)} onOpenAgent={()=>setOpenAgent(true)} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} showcaseMode={showcaseMode} onToggleShowcase={toggleShowcase} showcaseOpacity={showcaseOpacity} onOpacityChange={setShowcaseOpacity} />
       <main className={`flex flex-1 overflow-hidden relative ${authUser ? '' : 'select-none'}`}>
         {/* Área de hover trigger quando collapsed */}
         {sidebarCollapsed && (
@@ -596,7 +613,9 @@ function App(){
           </div>
         )}
       </main>
-      <SettingsModal open={openSettings} onClose={()=>setOpenSettings(false)} currentUser={authUser} />
+      <SettingsModal
+        open={openSettings && !!authUser?.isAdmin}
+        onClose={()=>setOpenSettings(false)} currentUser={authUser} />
       <LoginModal open={showLogin} onClose={()=>{ if(authUser) setShowLogin(false) }} onSuccess={(u)=>{ setAuthUser(u); sessionStorage.setItem('authUser', JSON.stringify(u)); setShowLogin(false); setOpenSettings(false) }} />
       <AnalysisModal open={openAnalysis} onClose={()=>setOpenAnalysis(false)} />
       <AgentModal open={openAgent} onClose={()=>setOpenAgent(false)} />
